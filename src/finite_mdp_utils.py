@@ -25,7 +25,7 @@ from random import choices
 import gymnasium as gym
 from gymnasium import spaces
 
-from known_dynamics_env import KnownDynamicsEnv, SimpleKnownDynamicsEnv, RandomKnownDynamicsEnv, RecycleRobotEnv
+from known_dynamics_env import KnownDynamicsEnv
 
 
 def check_if_fmdp(environment: gym.Env):
