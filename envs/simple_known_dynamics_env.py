@@ -1,6 +1,11 @@
 from known_dynamics_env import KnownDynamicsEnv
 import numpy as np
 
+from finite_mdp_utils import generate_trajectory
+from finite_mdp_utils import get_uniform_policy_for_fully_connected
+from finite_mdp_utils import print_trajectory
+from finite_mdp_utils import format_trajectory_as_single_array
+
 class SimpleKnownDynamicsEnv(KnownDynamicsEnv):
     def __init__(self):
         self.__version__ = "0.1.0"
@@ -29,3 +34,13 @@ class SimpleKnownDynamicsEnv(KnownDynamicsEnv):
     
 if __name__ == "__main__":
     env = SimpleKnownDynamicsEnv()
+    num_steps = 10
+    uniform_policy = get_uniform_policy_for_fully_connected(env.S, env.A)
+    taken_actions, rewards_tp1, states = generate_trajectory(
+        env, uniform_policy, num_steps)
+    trajectory = format_trajectory_as_single_array(
+        taken_actions, rewards_tp1, states)
+    print("Complete trajectory vector:")
+    print(trajectory)
+    print("Interpret trajectory with print_trajectory() method:")
+    print_trajectory(trajectory)

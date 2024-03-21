@@ -1,6 +1,9 @@
 from known_dynamics_env import KnownDynamicsEnv
 import numpy as np
 
+from finite_mdp_utils import generate_trajectory
+from finite_mdp_utils import get_uniform_policy_for_fully_connected
+
 class RecycleRobotEnv(KnownDynamicsEnv):
     def __init__(self):
         self.__version__ = "0.1.0"
@@ -47,3 +50,7 @@ class RecycleRobotEnv(KnownDynamicsEnv):
     
 if __name__ == "__main__":
     env = RecycleRobotEnv()
+    
+    policy = get_uniform_policy_for_fully_connected(env.S, env.A)
+    t = generate_trajectory(env, policy, 10)
+    print(t)
