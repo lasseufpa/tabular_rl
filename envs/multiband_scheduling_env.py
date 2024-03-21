@@ -8,13 +8,15 @@ It assumes knowledge of the correct nextStateProbability such that it allows to 
 import numpy as np
 import itertools
 import sys
-import gymnasium as gym
-from gymnasium import spaces
+# import gymnasium as gym
+# from gymnasium import spaces
 
-from known_dynamics_env import KnownDynamicsEnv
+from verbose_kd_env import VerboseKnownDynamicsEnv
 import finite_mdp_utils as fmdp
+import optimum_values as optimum
 
-class MultibandToyExampleEnv(KnownDynamicsEnv):
+
+class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
 
     # def __init__(self, discount=1.0):
     def __init__(self):
@@ -28,8 +30,8 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
         states_info = [stateDictionaryGetIndex, stateListGivenIndex]
 
         # call superclass constructor
-        KnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
-                                  actions_info=actions_info, states_info=states_info)
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
+                                         actions_info=actions_info, states_info=states_info)
 
     def prettyPrint(self):
         '''Print MDP'''
@@ -133,7 +135,6 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
                               ' reward=', r,
                               sep='')
 
-
     def createActionsDataStructures(self, M, F):
         '''
         Creates two data structures to facilitate dealing with actions: 
@@ -205,7 +206,6 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
             uniqueIndex += 1
         return rewardDictionaryGetIndex, rewardListGivenIndex
 
-
     def createEnvironment(self):
         '''
         Most important function: creates the matrices that describe the MDP dynamics.
@@ -233,7 +233,7 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
         instead of rewardsTable = np.zeros((S, A))
         '''
 
-        debug_reward_values = True # in case you want to debug the reward values or check them
+        debug_reward_values = True  # in case you want to debug the reward values or check them
         # possible values for rewards, from sum rate to dropped packets multiplied by -10
         possibleRewards = [0, 1, 2, 3, 4, -10, -20, -30]
 
@@ -245,8 +245,9 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
         use_fancy_reward_definition = False
         if use_fancy_reward_definition:
             self.reward_due_transition_N_to_I = -5
-            possibleRewards = [0, 1, 2, 3, 4, -10, -20, -30, self.reward_due_transition_N_to_I]        
-                
+            possibleRewards = [0, 1, 2, 3, 4, -10, -
+                               20, -30, self.reward_due_transition_N_to_I]
+
         self.R = R = len(possibleRewards)
         self.B = B = 1  # buffer size of 1 packet per user
         # probabilities that define the intercell interference represented as states: 'I' and 'N'
@@ -270,7 +271,8 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
         S = len(stateListGivenIndex)
 
         if debug_reward_values:
-            rewardDictionaryGetIndex, rewardListGivenIndex = self.createRewardsDataStructures(possibleRewards)
+            rewardDictionaryGetIndex, rewardListGivenIndex = self.createRewardsDataStructures(
+                possibleRewards)
 
         # now we need to populate the nextStateProbability array and rewardsTable
         nextStateProbability = np.zeros((S, A, S))
@@ -281,7 +283,7 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
             currentInterference = False
             if currentState[1] == 'I':
                 currentInterference = True
-            for a in range(A): # go over all pairs (s, a)
+            for a in range(A):  # go over all pairs (s, a)
                 currentAction = actionListGivenIndex[a]
                 (u1, u2, f1, f2) = currentAction
                 # start assuming maximum throughput of 2 packets per user
@@ -289,9 +291,9 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
                 t2 = 2
                 if u2 == 2 and f2 == 'H':
                     t2 = 1  # user 2 is far from BS and get only 1 if higher freq. is used
-                if currentInterference == True: # in this case 'I' there is intercell interference
+                if currentInterference == True:  # in this case 'I' there is intercell interference
                     # check whether u2 is scheduled in this TTI
-                    if u2 == 2: # user 2 is never scheduled as u1, so we can check if u2==2
+                    if u2 == 2:  # user 2 is never scheduled as u1, so we can check if u2==2
                         t2 = 1  # when system is experiencing intercell interference, user 2 can only transmit 1 packet
                 if u1 == 0 and u2 == 1:  # If U0 and U1 are scheduled simultaneously, they transmit only 1 packet each
                     t1 = 1
@@ -307,31 +309,38 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
                     t2 = buffersTuple[u2] + 1
 
                 # new buffer state. Note that it does not depend on interference
-                transmitRate = np.array([0, 0, 0]) # initialize
+                transmitRate = np.array([0, 0, 0])  # initialize
                 transmitRate[u1] = t1
                 transmitRate[u2] = t2
-                buffersArray = np.array(buffersTuple) # enable doing arithmetics
+                # enable doing arithmetics
+                buffersArray = np.array(buffersTuple)
                 newBuffers = np.array([1, 1, 1]) + buffersArray - transmitRate
                 # instead of drop = np.argwhere(newBuffers == 2), use:
-                drop = newBuffers == 2 # check if buffer overflow occurred (dropped packets)
-                newBuffers[drop] = 1 # if buffer overflow happened, correct the buffer occupancy to its maximum of 1
-                newBuffersTuple = tuple(newBuffers) # convert back from array to tuple
+                # check if buffer overflow occurred (dropped packets)
+                drop = newBuffers == 2
+                # if buffer overflow happened, correct the buffer occupancy to its maximum of 1
+                newBuffers[drop] = 1
+                # convert back from array to tuple
+                newBuffersTuple = tuple(newBuffers)
 
                 # calculate initial reward value
                 # (it may change in case use_fancy_reward_definition is True and
                 #  a transition from 'N' to 'I' happens)
-                sumDrops = np.sum(drop) # drop is array with number of dropped packets per user
+                # drop is array with number of dropped packets per user
+                sumDrops = np.sum(drop)
                 if sumDrops > 0:
                     r = -10 * sumDrops
                 else:
-                    r = np.sum(transmitRate) # transmitRate is array with number of successfully transmitted packets per user
+                    # transmitRate is array with number of successfully transmitted packets per user
+                    r = np.sum(transmitRate)
 
                 # probabilistic part: consider the two cases of intercell interference: 'I' and 'N'
-                if currentInterference == True: # case 'I', there is interference
+                if currentInterference == True:  # case 'I', there is interference
                     # a) assume that system continues to have interference (remains at 'I' state)
                     nextState = (newBuffersTuple, 'I')
                     nextStateIndice = stateDictionaryGetIndex[nextState]
-                    nextStateProbability[s, a, nextStateIndice] = 1 - beta # loop probability to remain in 'I'
+                    # loop probability to remain in 'I'
+                    nextStateProbability[s, a, nextStateIndice] = 1 - beta
                     rewardsTable[s, a, nextStateIndice] = r
                     # memorize which users had packets dropped
                     if r < 0:
@@ -340,17 +349,19 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
                     # b) assume that system makes a transition to no interference (jumps from 'I' to 'N' state)
                     nextState = (newBuffersTuple, 'N')
                     nextStateIndice = stateDictionaryGetIndex[nextState]
-                    nextStateProbability[s, a, nextStateIndice] = beta # transition probability
+                    # transition probability
+                    nextStateProbability[s, a, nextStateIndice] = beta
                     rewardsTable[s, a, nextStateIndice] = r
                     # memorize which users had packets dropped
                     if r < 0:
                         self.dictionaryOfUsersWithDroppedPackets[(
                             s, a, nextStateIndice)] = drop
-                else: # case 'N', there is no interference at current time instant
+                else:  # case 'N', there is no interference at current time instant
                     # a) assume that system continues to have no interference (remains at 'N' state)
                     nextState = (newBuffersTuple, 'N')
                     nextStateIndice = stateDictionaryGetIndex[nextState]
-                    nextStateProbability[s, a, nextStateIndice] = 1 - alpha # loop probability to remain in 'N'
+                    # loop probability to remain in 'N'
+                    nextStateProbability[s, a, nextStateIndice] = 1 - alpha
                     rewardsTable[s, a, nextStateIndice] = r
                     # memorize which users had packets dropped
                     if r < 0:
@@ -362,15 +373,17 @@ class MultibandToyExampleEnv(KnownDynamicsEnv):
                         r = np.minimum(r, self.reward_due_transition_N_to_I)
                     nextState = (newBuffersTuple, 'I')
                     nextStateIndice = stateDictionaryGetIndex[nextState]
-                    nextStateProbability[s, a, nextStateIndice] = alpha # transition probability
+                    # transition probability
+                    nextStateProbability[s, a, nextStateIndice] = alpha
                     rewardsTable[s, a, nextStateIndice] = r
                     # memorize which users had packets dropped
                     if r < 0:
                         self.dictionaryOfUsersWithDroppedPackets[(
                             s, a, nextStateIndice)] = drop
 
-                if debug_reward_values: # to debug
-                    rewardIndice = rewardDictionaryGetIndex[r]  # just to check if dictionary is complete
+                if debug_reward_values:  # to debug
+                    # just to check if dictionary is complete
+                    rewardIndice = rewardDictionaryGetIndex[r]
 
         return nextStateProbability, rewardsTable, actionDictionaryGetIndex, actionListGivenIndex, stateDictionaryGetIndex, stateListGivenIndex
 
@@ -436,15 +449,15 @@ def evaluateLearning():
 if __name__ == '__main__':
     env = MultibandToyExampleEnv()
     env.prettyPrint()
-    exit(1)
-    #fmdp.compare_q_learning_with_optimum_policy(
+
+    # fmdp.compare_q_learning_with_optimum_policy(
     #    env, output_files_prefix="MultibandToyExample")
     # if True:
     # this may take long time to run
     # fmdp.hyperparameter_grid_search(env)
 
     # Get optimum action values
-    action_values, stopping_criteria = fmdp.compute_optimal_action_values(
+    action_values, stopping_criteria = optimum.compute_optimal_action_values(
         env, tolerance=0)
     iteration = stopping_criteria.shape[0]  # number of iterations
     stopping_criterion = stopping_criteria[-1]  # final stopping criterion
@@ -452,6 +465,6 @@ if __name__ == '__main__':
 
     # Now convert from values to policy, to show the optimum policy
     policy = fmdp.convert_action_values_into_policy(action_values)
-    fmdp.pretty_print_policy(env, policy)
+    env.pretty_print_policy(policy)
     print("\nConverged with", iteration,
           "iterations with final stopping criterion=", stopping_criterion)

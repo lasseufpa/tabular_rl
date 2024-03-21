@@ -26,11 +26,12 @@ import gymnasium
 from gymnasium import spaces
 from random import choices, randint
 
-from known_dynamics_env import KnownDynamicsEnv
+from verbose_kd_env import VerboseKnownDynamicsEnv
 import finite_mdp_utils as fmdp
+import optimum_values as optimum
 
 
-class SuttonGridWorldEnv(KnownDynamicsEnv):
+class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
     '''
     It is a subclass of NextStateProbabilitiesEnv. It is the
     superclass that implements the step() function.
@@ -55,8 +56,8 @@ class SuttonGridWorldEnv(KnownDynamicsEnv):
             WORLD_SIZE, stateDictionaryGetIndex)
 
         # superclass constructor
-        KnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
-                                  actions_info=actions_info, states_info=states_info)
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
+                                         actions_info=actions_info, states_info=states_info)
 
     def postprocessing_MDP_step(self, history, printPostProcessingInfo):
         '''This method overrides its superclass equivalent and
@@ -211,7 +212,7 @@ def reproduce_figures():
     print('State values:')
     print(np.round(np.reshape(state_values, (5, 5)), 1))
 
-    state_values, iteration = fmdp.compute_optimal_state_values(env)
+    state_values, iteration = optimum.compute_optimal_state_values(env)
     print(
         'Reproducing Fig. 3.5 from [Sutton, 2018] with optimum policy in page 65.')
     print('Figure 3.5: Optimal solutions to the gridworld example')
@@ -221,7 +222,7 @@ def reproduce_figures():
 
     # use the value-based policy to obtain the \pi_star right subplot in Fig. 3.5.
     tolerance = 0  # execute until full convergence
-    action_values, stopping_criteria = fmdp.compute_optimal_action_values(
+    action_values, stopping_criteria = optimum.compute_optimal_action_values(
         env, tolerance=tolerance)
     print('Stopping criteria until convergence =', stopping_criteria)
 
@@ -229,7 +230,8 @@ def reproduce_figures():
         print('iteration = ', iteration, ' stopping_criterion=', stopping_criterion, ' action_values = ',
               np.round(action_values, 1))
     policy = fmdp.convert_action_values_into_policy(action_values)
-    fmdp.pretty_print_policy(env, policy)
+    print("policy", policy)
+    env.pretty_print_policy(policy)
 
 
 if __name__ == '__main__':
@@ -242,7 +244,7 @@ if __name__ == '__main__':
     total_number_of_updates = 500000
     num_episodes = 500
     max_num_time_steps_per_episode = total_number_of_updates // num_episodes
-    fmdp.compare_q_learning_with_optimum_policy(env,
-                                                max_num_time_steps_per_episode=max_num_time_steps_per_episode,
-                                                num_episodes=num_episodes,
-                                                explorationProbEpsilon=0.2)
+    optimum.compare_q_learning_with_optimum_policy(env,
+                                                   max_num_time_steps_per_episode=max_num_time_steps_per_episode,
+                                                   num_episodes=num_episodes,
+                                                   explorationProbEpsilon=0.2)

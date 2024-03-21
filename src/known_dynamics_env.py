@@ -1,10 +1,14 @@
 '''
-Gym (gymnasium) env for known MDP dynamics, that is, the probability distributions and
-rewards are given using four arrays:
-a) next state probabilities (nextStateProbability)
-b) rewards table
-Note that if these two matrices are assumed to be "correct" (representing the actual world),
-then one can calculate the optimum solution using the iterative methods in FiniteMDP.
+Gym (gymnasium) environment for a canonical MDP with known dynamics.
+The dynamics is specified by the next state probability distributions 
+p(s'/s,a) and a deterministic rewards table r(s,a,s').
+Because we assume p(s'/s,a) and r(s,a,s') are the "correct" (represent
+the actual world), one can calculate the optimum solution using fast
+iterative methods called value iteration.
+
+This code uses four arrays:
+a) nextStateProbability: next state probabilities
+b) rewardsTable: table with reward values
 
 The other two arrays we use can be created on-the-fly.
 The first one is needed for creating trajectories:
@@ -14,7 +18,9 @@ d) valid_next_states
 These two arrays speed up computations but consume RAM memory. Maybe we
 will have to test things without them.
 
-This version assumes Moore (not Mealy) model and full (not sparse) matrices.
+This version assumes the rewards are associated to the triple
+(s,a,s') (correspond to a Mealy machine),
+It also assumes full (not sparse) matrices.
 
 The initial state determined by reset() is random: any possible state.
 
@@ -28,11 +34,8 @@ gymnasium.Env with spaces.Discrete() for both states (called observations in gym
 and actions.
 
 If the environment wants to have knowledge about the labels associated
-to the natural numbers used with/in this MDP class (in the grid-world example,
-the labels "left", "right", "up", "down"), we should have a superclass called
-Verbose or have verbosity as an option in constructor. In the verbose case,
-the environment provides
-the label information via the lists: stateListGivenIndex and actionListGivenIndex.
+to the natural numbers used with/in this MDP class, use
+@VerboseKnownDynamicsEnv
 
 @TODO:
  - support Moore (rewards associated to states) instead of only Mealy (rewards associated to transitions) (see https://www.youtube.com/watch?v=YiQxeuB56i0)
@@ -55,24 +58,12 @@ from gymnasium import spaces
 
 
 class KnownDynamicsEnv(gym.Env):
-    def __init__(self, nextStateProbability, rewardsTable,
-                 action_association='state', states_info=None, actions_info=None):
+    def __init__(self, nextStateProbability, rewardsTable):
         super(KnownDynamicsEnv, self).__init__()
         self.__version__ = "0.1.0"
         # print("AK Finite MDP - Version {}".format(self.__version__))
         self.nextStateProbability = nextStateProbability
         self.rewardsTable = rewardsTable  # expected rewards
-
-        # we may want to have different classes for Mealy and Moore. But if
-        # it is not the case and want to have this as a parameter of this class
-        # we would need to complete the code:
-        if action_association == 'state':
-            x = 1  # @TODO
-        elif action_association == 'transition':
-            x = 2  # @TODO
-        else:
-            raise Exception(
-                "Invalid option. action_association must be state or transition.")
 
         self.current_observation_or_state = 0
 
@@ -93,22 +84,6 @@ class KnownDynamicsEnv(gym.Env):
         self.action_space = spaces.Discrete(self.A)
         # states are called observations in gym
         self.observation_space = spaces.Discrete(self.S)
-
-        if actions_info == None:
-            # initialize with default names and structures
-            self.actionDictionaryGetIndex, self.actionListGivenIndex = createDefaultDataStructures(
-                self.A, "A")
-        else:
-            self.actionDictionaryGetIndex = actions_info[0]
-            self.actionListGivenIndex = actions_info[1]
-
-        if states_info == None:
-            # initialize with default names and structures
-            self.stateDictionaryGetIndex, self.stateListGivenIndex = createDefaultDataStructures(
-                self.S, "S")
-        else:
-            self.stateDictionaryGetIndex = states_info[0]
-            self.stateListGivenIndex = states_info[1]
 
         self.currentIteration = 0
         self.reset()
@@ -193,8 +168,10 @@ class KnownDynamicsEnv(gym.Env):
         gameOver = False  # this is a continuing FMDP that never ends
 
         # history version with actions and states, not their indices
-        history = {"time": self.currentIteration, "state_t": self.stateListGivenIndex[s], "action_t": self.actionListGivenIndex[action],
-                   "reward_tp1": reward, "state_tp1": self.stateListGivenIndex[nexts]}
+        # history = {"time": self.currentIteration, "state_t": self.stateListGivenIndex[s], "action_t": self.actionListGivenIndex[action],
+        #           "reward_tp1": reward, "state_tp1": self.stateListGivenIndex[nexts]}
+        history = {"time": self.currentIteration, "state_t": s, "action_t": action,
+                   "reward_tp1": reward, "state_tp1": nexts}
 
         # update for next iteration
         self.currentIteration += 1  # update counter
@@ -224,19 +201,57 @@ class KnownDynamicsEnv(gym.Env):
         self.current_observation_or_state = randint(0, self.S - 1)
         return self.current_observation_or_state
 
-    # from gym.utils import seeding
-    # def seed(self, seed=None):
-    #    self.np_random, seed = seeding.np_random(seed)
-    #    return [seed]
+    def get_uniform_policy_for_known_dynamics(self) -> np.ndarray:
+        '''
+        Takes in account the dynamics of the defined environment
+        when defining actions that can be performed at each state.
+        See @get_uniform_policy_for_fully_connected for
+        an alternative that does not have restriction.
+        '''
+        policy = np.zeros((self.S, self.A))
+        for s in range(self.S):
+            # possible_actions_per_state is a list of lists, that indicates for each state, the list of allowed actions
+            valid_actions = self.possible_actions_per_state[s]
+            # no problem if denominator is zero
+            uniform_probability = 1.0 / len(valid_actions)
+            for a in range(len(valid_actions)):
+                policy[s, a] = uniform_probability
+        return policy
+
+    def pretty_print_policy(self, policy: np.ndarray):
+        '''
+        Print policy.
+        '''
+        for s in range(self.S):
+            currentState = s
+            print('\ns' + str(s) + '=' + str(currentState))
+            first_action = True
+            for a in range(self.A):
+                if policy[s, a] == 0:
+                    continue
+                currentAction = a
+                if first_action:
+                    print(' | a' + str(a) + '=' + str(currentAction), end='')
+                    first_action = False  # disable this way of printing
+                else:
+                    print(' or a' + str(a) + '=' + str(currentAction), end='')
+        print("")
 
 
-def createDefaultDataStructures(num, prefix) -> tuple[dict, list]:
-        possibleActions = list()
-        for uniqueIndex in range(num):
-            possibleActions.append(prefix + str(uniqueIndex))
-        dictionaryGetIndex = dict()
-        listGivenIndex = list()
-        for uniqueIndex in range(num):
-            dictionaryGetIndex[possibleActions[uniqueIndex]] = uniqueIndex
-            listGivenIndex.append(possibleActions[uniqueIndex])
-        return dictionaryGetIndex, listGivenIndex
+if __name__ == '__main__':
+    print("Main:")
+    nextStateProbability = np.array([[[0.5, 0.5, 0],
+                                      [0.9, 0.1, 0]],
+                                     [[0, 0.5, 0.5],
+                                      [0, 0.2, 0.8]],
+                                     [[0, 0, 1],
+                                      [0, 0, 1]]])
+    rewardsTable = np.array([[[-3, 0, 0],
+                              [-2, 5, 5]],
+                             [[4, 5, 0],
+                              [2, 2, 6]],
+                             [[-8, 2, 80],
+                              [11, 0, 3]]])
+
+    env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
+    print(env.step(1))

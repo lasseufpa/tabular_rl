@@ -39,12 +39,14 @@ import itertools
 import pickle
 import os
 
-from known_dynamics_env import KnownDynamicsEnv
+from verbose_kd_env import VerboseKnownDynamicsEnv
 import finite_mdp_utils as fmdp
+import optimum_values as optimum
+
 from mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
 
 
-class UserSchedulingEnv(KnownDynamicsEnv):
+class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
     def __init__(self, G=6, B=3, Nu=2, num_pkts_per_tti=2,
                  can_users_share_position=False,
@@ -95,8 +97,8 @@ class UserSchedulingEnv(KnownDynamicsEnv):
                        self.stateGivenIndexList]
 
         # call superclass constructor
-        KnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
-                                  actions_info=actions_info, states_info=states_info)
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
+                                         actions_info=actions_info, states_info=states_info)
         if self.print_debug_info:
             print("INFO: finished creating environment")
 
@@ -413,7 +415,7 @@ if __name__ == '__main__':
     env.postprocessing_MDP_step(history, printPostProcessingInfo)
 
     if True:
-        fmdp.compare_q_learning_with_optimum_policy(env)
+        optimum.compare_q_learning_with_optimum_policy(env)
     if True:
         # this may take long time to run
         fmdp.hyperparameter_grid_search(env)

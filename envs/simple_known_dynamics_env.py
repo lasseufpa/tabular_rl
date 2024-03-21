@@ -1,10 +1,8 @@
 from known_dynamics_env import KnownDynamicsEnv
 import numpy as np
 
-from finite_mdp_utils import generate_trajectory
-from finite_mdp_utils import get_uniform_policy_for_fully_connected
-from finite_mdp_utils import print_trajectory
-from finite_mdp_utils import format_trajectory_as_single_array
+import finite_mdp_utils as fmdp
+
 
 class SimpleKnownDynamicsEnv(KnownDynamicsEnv):
     def __init__(self):
@@ -31,16 +29,17 @@ class SimpleKnownDynamicsEnv(KnownDynamicsEnv):
         super().reset()
         self.current_observation_or_state = 0
         return self.current_observation_or_state
-    
+
+
 if __name__ == "__main__":
     env = SimpleKnownDynamicsEnv()
     num_steps = 10
-    uniform_policy = get_uniform_policy_for_fully_connected(env.S, env.A)
-    taken_actions, rewards_tp1, states = generate_trajectory(
+    uniform_policy = fmdp.get_uniform_policy_for_fully_connected(env.S, env.A)
+    taken_actions, rewards_tp1, states = fmdp.generate_trajectory(
         env, uniform_policy, num_steps)
-    trajectory = format_trajectory_as_single_array(
+    trajectory = fmdp.format_trajectory_as_single_array(
         taken_actions, rewards_tp1, states)
     print("Complete trajectory vector:")
     print(trajectory)
     print("Interpret trajectory with print_trajectory() method:")
-    print_trajectory(trajectory)
+    fmdp.print_trajectory(trajectory)

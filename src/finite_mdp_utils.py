@@ -2,7 +2,7 @@
 This class implements methods to deal with 
 a finite Markov Decision Process (MDP) for tabular RL.
 Look at the definition of a finite MDP in page 49 of
-Sutton & Barto's book, version 2018, with 550 pages.
+Sutton & Barto's book, version 2020:
 
     Note that a policy is represented here as a distribution over the
     possible actions for each state and stored as an array of dimension S x A.
@@ -24,7 +24,6 @@ import numpy as np
 from random import choices
 import gymnasium as gym
 from gymnasium import spaces
-
 from known_dynamics_env import KnownDynamicsEnv
 
 
@@ -91,230 +90,6 @@ def compute_state_values(env: gym.Env, policy: np.ndarray, in_place=False,
     return state_values, iteration
 
 
-def compute_optimal_state_values_nonsparse(env: KnownDynamicsEnv, discountGamma=0.9) -> tuple[np.ndarray, int]:
-    '''Page 63 of [Sutton, 2018], Eq. (3.19)'''
-    # assert isinstance(env, KnownDynamicsEnv)
-    S = env.S
-    A = env.A
-    # (S, A, nS) = env.nextStateProbability.shape
-    # A = len(actionListGivenIndex)
-    new_state_values = np.zeros((S,))
-    state_values = np.zeros((S,))
-    iteration = 1
-    a_candidates = np.zeros((A,))
-    while True:
-        for s in range(S):
-            # fill with zeros without creating new array
-            # a_candidates[:] = 0
-            a_candidates.fill(0.0)
-            for a in range(A):
-                value = 0
-                for nexts in range(S):
-                    p = env.nextStateProbability[s, a, nexts]
-                    if p != 0:
-                        r = env.rewardsTable[s, a, nexts]
-                        value += p * (r + discountGamma * state_values[nexts])
-                a_candidates[a] = value
-            new_state_values[s] = np.max(a_candidates)
-        improvement = np.sum(np.abs(new_state_values - state_values))
-        # print('improvement =', improvement)
-        if False:  # debug
-            print('state values=', state_values)
-            print('new state values=', new_state_values)
-            print('it=', iteration, 'improvement = ', improvement)
-        # I am avoiding to use np.copy() here because memory kept growing
-        for i in range(S):
-            state_values[i] = new_state_values[i]
-        if improvement < 1e-4:
-            break
-
-        iteration += 1
-
-    return state_values, iteration
-
-
-def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_nonsparse_version=False) -> tuple[np.ndarray, int]:
-    '''
-    This is useful when nextStateProbability is sparse. It only goes over the
-    next states that are feasible.
-    Page 63 of [Sutton, 2018], Eq. (3.19)'''
-    if use_nonsparse_version:
-        return compute_optimal_state_values_nonsparse(env, discountGamma)
-
-    assert isinstance(env, KnownDynamicsEnv)
-
-    S = env.S
-
-    # (S, A, nS) = env.nextStateProbability.shape
-    # A = len(actionListGivenIndex)
-    new_state_values = np.zeros((S,))
-    state_values = np.zeros((S,))
-    iteration = 1
-    valid_next_states = env.valid_next_states
-    while True:
-        for s in range(S):
-
-            possibleAction = env.possible_actions_per_state[s] #Getting the Possible actions per state
-            a_candidates = np.zeros(len(possibleAction)) #Creating a array to compute the possibles actions 
-            # print(s)
-            # fill with zeros without creating new array
-            # a_candidates[:] = 0
-            a_candidates.fill(0.0)
-            feasible_next_states = valid_next_states[s]
-            num_of_feasible_next_states = len(feasible_next_states)
-            for a in possibleAction:
-                value = 0
-                # for nexts in range(S):
-                for feasible_nexts in range(num_of_feasible_next_states):
-                    # print('feasible_nexts=',feasible_nexts)
-                    nexts = feasible_next_states[feasible_nexts]
-                    p = env.nextStateProbability[s, a, nexts]
-                    r = env.rewardsTable[s, a, nexts]
-                    # print('p',p,'state_values[nexts]',state_values[nexts],'r',r)
-                    value += p * (r + discountGamma * state_values[nexts])
-                a_candidates[a] = value
-            new_state_values[s] = np.max(a_candidates)
-        improvement = np.sum(np.abs(new_state_values - state_values))
-        # print('improvement =', improvement)
-        if True:  # debug AK
-            print('state values=', state_values)
-            print('new state values=', new_state_values)
-            print('it=', iteration, 'improvement = ', improvement)
-        # I am avoiding to use np.copy() here because memory kept growing
-        for i in range(S):
-            state_values[i] = new_state_values[i]
-        if improvement < 1e-4:
-            break
-
-        iteration += 1
-
-    return state_values, iteration
-
-
-def compute_optimal_action_values_nonsparse(env: KnownDynamicsEnv,
-                                            discountGamma=0.9,
-                                            tolerance=1e-20) -> tuple[np.ndarray, np.ndarray]:
-    '''
-    In [Sutton, 2018] the main result of this method in called "the optimal
-    action-value function" and defined in Eq. (3.16) in page 63.
-    Page 64 of [Sutton, 2018], Eq. (3.20)'''
-
-    assert isinstance(env, KnownDynamicsEnv)
-    S = env.S
-    A = env.A
-    # (S, A, nS) = env.nextStateProbability.shape
-    # A = len(actionListGivenIndex)
-    new_action_values = np.zeros((S, A))
-    action_values = new_action_values.copy()
-    iteration = 1
-    stopping_criteria = list()
-    while True:
-        # src = new_action_values if in_place else action_values
-        for s in range(S):
-            for a in range(A):
-                value = 0
-                for nexts in range(S):
-                    # p(s'|s,a) = p(nexts|s,a)
-                    p = env.nextStateProbability[s, a, nexts]
-                    # r(s,a,s') = r(s,a,nexts)
-                    r = env.rewardsTable[s, a, nexts]
-                    best_a = -np.Infinity
-                    for nexta in range(A):
-                        temp = action_values[nexts, nexta]
-                        if temp > best_a:
-                            best_a = temp
-                    value += p * (r + discountGamma * best_a)
-                    # value += p*(r+discount*src[nexts])
-                    # print('aa', value)
-                new_action_values[s, a] = value
-        improvement = np.sum(np.abs(new_action_values - action_values))
-        # print('improvement =', improvement)
-        if False:  # debug
-            print('state values=', action_values)
-            print('new state values=', new_action_values)
-            print('it=', iteration, 'improvement = ', improvement)
-        stopping_criteria.append(improvement)
-        if improvement <= tolerance:
-            action_values = new_action_values.copy()
-            break
-
-        action_values = new_action_values.copy()
-        iteration += 1
-
-    return action_values, np.array(stopping_criteria)
-
-
-def compute_optimal_action_values(env: KnownDynamicsEnv,
-                                  discountGamma=0.9,
-                                  use_nonsparse_version=False,
-                                  tolerance=1e-20) -> tuple[np.ndarray, np.ndarray]:
-    '''
-    In [Sutton, 2018] the main result of this method in called "the optimal
-    action-value function" and defined in Eq. (3.16) in page 63.
-
-    Assumes sparsity.
-    Page 64 of [Sutton, 2018], Eq. (3.20)'''
-    if use_nonsparse_version:
-        return compute_optimal_action_values_nonsparse(env, discountGamma=discountGamma, tolerance=tolerance)
-
-    assert isinstance(env, KnownDynamicsEnv)
-    S = env.S
-    A = env.A
-    new_action_values = np.zeros((S, A))
-    action_values = np.zeros((S, A))
-    iteration = 1
-    valid_next_states = env.valid_next_states
-    stopping_criteria_per_iteration = list()
-    while True:
-        for s in range(S):
-            feasible_next_states = valid_next_states[s]
-            num_of_feasible_next_states = len(feasible_next_states)
-            for a in range(A):
-                value = 0
-                for feasible_nexts in range(num_of_feasible_next_states):
-                    nexts = feasible_next_states[feasible_nexts]
-                    # p(s'|s,a) = p(nexts|s,a)
-                    p = env.nextStateProbability[s, a, nexts]
-                    # r(s,a,s') = r(s,a,nexts)
-                    r = env.rewardsTable[s, a, nexts]
-                    best_a = np.max(action_values[nexts])
-                    value += p * (r + discountGamma * best_a)
-                new_action_values[s, a] = value
-
-        # check if should stop because process converged
-        abs_difference_array = np.abs(new_action_values - action_values)
-        stopping_criterion_option = 2  # 1 uses sum and 2 uses max
-        if stopping_criterion_option == 1:
-            # use the sum
-            stopping_criterion = np.sum(
-                abs_difference_array)/np.max(np.abs(new_action_values))
-        else:
-            # use the max
-            stopping_criterion = np.max(
-                abs_difference_array)/np.max(np.abs(new_action_values))
-        stopping_criteria_per_iteration.append(stopping_criterion)
-        # print('DEBUG: stopping_criterion =', stopping_criterion)
-        if False:  # debug
-            print('state values=', action_values)
-            print('new state values=', new_action_values)
-            print('it=', iteration, 'improvement = ', stopping_criterion)
-
-        # action_values = new_action_values.copy()
-        # I am avoiding to use np.copy() here because memory kept growing
-        for i in range(S):
-            for j in range(A):
-                action_values[i, j] = new_action_values[i, j]
-
-        if stopping_criterion <= tolerance:
-            # print('DEBUG: stopping_criterion =',
-            #      stopping_criterion, "and tolerance=", tolerance)
-            break
-
-        iteration += 1
-
-    return action_values, np.array(stopping_criteria_per_iteration)
-
-
 def convert_action_values_into_policy(action_values: np.ndarray) -> np.ndarray:
     (S, A) = action_values.shape
     policy = np.zeros((S, A))
@@ -339,25 +114,6 @@ def get_uniform_policy_for_fully_connected(S: int, A: int) -> np.ndarray:
     for s in range(S):
         for a in range(A):
             policy[s, a] = uniformProbability
-    return policy
-
-
-def get_uniform_policy_for_known_dynamics(env: KnownDynamicsEnv) -> np.ndarray:
-    '''
-    Takes in account the dynamics of the defined environment
-    when defining actions that can be performed at each state.
-    See @get_uniform_policy_for_fully_connected for
-    an alternative that does not have restriction.
-    '''
-    assert isinstance(env, KnownDynamicsEnv)
-    policy = np.zeros((env.S, env.A))
-    for s in range(env.S):
-        # possible_actions_per_state is a list of lists, that indicates for each state, the list of allowed actions
-        valid_actions = env.possible_actions_per_state[s]
-        # no problem if denominator is zero
-        uniform_probability = 1.0 / len(valid_actions)
-        for a in range(len(valid_actions)):
-            policy[s, a] = uniform_probability
     return policy
 
 
@@ -635,26 +391,6 @@ def print_trajectory(trajectory: np.ndarray):
           str(T) + "=" + str(trajectory[-1]))
 
 
-def pretty_print_policy(env: KnownDynamicsEnv, policy: np.ndarray):
-    '''
-    Print policy.
-    '''
-    for s in range(env.S):
-        currentState = env.stateListGivenIndex[s]
-        print('\ns' + str(s) + '=' + str(currentState))
-        first_action = True
-        for a in range(env.A):
-            if policy[s, a] == 0:
-                continue
-            currentAction = env.actionListGivenIndex[a]
-            if first_action:
-                print(' | a' + str(a) + '=' + str(currentAction), end='')
-                first_action = False  # disable this way of printing
-            else:
-                print(' or a' + str(a) + '=' + str(currentAction), end='')
-    print("")
-
-
 def hyperparameter_grid_search(env: gym.Env):
     '''
     Grid search over alphas and epsilons
@@ -672,62 +408,6 @@ def hyperparameter_grid_search(env: gym.Env):
                   " for grid search for alpha=", a, 'epsilon=', e)
             # fileName = 'smooth_q_eps' + str(e) + '_alpha' + str(a) + '.txt'
             # sys.stdout = open(fileName, 'w')
-
-
-def compare_q_learning_with_optimum_policy(env: KnownDynamicsEnv,
-                                           max_num_time_steps_per_episode=100,
-                                           num_episodes=10,
-                                           explorationProbEpsilon=0.2,
-                                           output_files_prefix=None):
-    # find and use optimum policy
-    env.reset()
-    tolerance = 1e-10
-    action_values, stopping_criteria = compute_optimal_action_values(
-        env, tolerance=tolerance)
-    iteration = stopping_criteria.shape[0]
-    stopping_criterion = stopping_criteria[-1]
-    print("\nMethod compute_optimal_action_values() converged in",
-          iteration, "iterations with stopping criterion=", stopping_criterion)
-    optimum_policy = convert_action_values_into_policy(action_values)
-    optimal_rewards = run_several_episodes(env, optimum_policy,
-                                           max_num_time_steps_per_episode=max_num_time_steps_per_episode,
-                                           num_episodes=num_episodes)
-    average_reward = np.mean(optimal_rewards)
-    stddev_reward = np.std(optimal_rewards)
-    print('\nUsing optimum policy, average reward=',
-          average_reward, ' standard deviation=', stddev_reward)
-
-    # learn a policy with Q-learning. Use a single run.
-    stateActionValues, rewardsQLearning = q_learning_several_episodes(
-        env, num_runs=1, episodes_per_run=num_episodes,
-        max_num_time_steps_per_episode=max_num_time_steps_per_episode,
-        explorationProbEpsilon=explorationProbEpsilon)
-    print('stateActionValues:', stateActionValues)
-    print('rewardsQLearning:', rewardsQLearning)
-
-    # print('Using Q-learning, total reward over training=',np.sum(rewardsQLearning))
-    qlearning_policy = convert_action_values_into_policy(
-        stateActionValues)
-    qlearning_rewards = run_several_episodes(env, qlearning_policy,
-                                             max_num_time_steps_per_episode=max_num_time_steps_per_episode,
-                                             num_episodes=num_episodes)
-    average_reward = np.mean(qlearning_rewards)
-    stddev_reward = np.std(qlearning_rewards)
-    print('\nUsing Q-learning policy, average reward=',
-          average_reward, ' standard deviation=', stddev_reward)
-
-    print('Check the Q-learning policy:')
-    pretty_print_policy(env, qlearning_policy)
-
-    if not output_files_prefix == None:
-        with open(output_files_prefix + '_optimal.txt', 'w') as f:
-            f.write(str(optimal_rewards) + "\n")
-
-        with open(output_files_prefix + '_qlearning.txt', 'w') as f:
-            f.write(str(qlearning_rewards) + "\n")
-
-        print("Wrote files", output_files_prefix + "_optimal.txt",
-              "and", output_files_prefix + "_qlearning.txt.")
 
 
 def test_dealing_with_sparsity():
@@ -774,7 +454,7 @@ def TODO_estimate_model_probabilities(env: gym.Env):
 
 if __name__ == '__main__':
 
-    #test_dealing_with_sparsity()
+    # test_dealing_with_sparsity()
 
     values = np.array([[3, 5, -4, 2], [10, 10, 0, -20]])
     policy = convert_action_values_into_policy(values)
@@ -787,35 +467,3 @@ if __name__ == '__main__':
     print_trajectory(trajectory)
     # test_with_sparse_NextStateProbabilitiesEnv()
     # test_with_NextStateProbabilitiesEnv()
-
-    env = RecycleRobotEnv()
-    print("About environment:")
-    print("Num of states =", env.S)
-    print("Num of actions =", env.A)
-    print("env.possible_actions_per_state =", env.possible_actions_per_state)
-    print("env.nextStateProbability =", env.nextStateProbability)
-    print("env.rewardsTable =", env.rewardsTable)
-
-    uniform_policy = get_uniform_policy_for_known_dynamics(env)
-    # several actions (a whole "trajectory")
-    num_steps = 10
-    taken_actions, rewards_tp1, states = generate_trajectory(
-        env, uniform_policy, num_steps)
-    trajectory = format_trajectory_as_single_array(
-        taken_actions, rewards_tp1, states)
-    print("Complete trajectory vector:")
-    print(trajectory)
-    print("Interpret trajectory with print_trajectory() method:")
-    print_trajectory(trajectory)
-
-    print("compute_optimal_state_values(env)=", compute_optimal_state_values(env))
-
-    exit(-1)
-    total_rewards = run_episode(
-        env, uniform_policy, maxNumIterations=8, printInfo=True, printPostProcessingInfo=True)
-    print("Total_rewards =", total_rewards)
-
-    stateActionValues, rewardsQLearning = q_learning_several_episodes(
-        env, max_num_time_steps_per_episode=20, episodes_per_run=5000, num_runs=20, verbosity=1)
-    print("Q learning stateActionValues =", stateActionValues)
-    print("rewardsQLearning =", rewardsQLearning)
