@@ -1,11 +1,11 @@
 # tabular_rl
-Code for finite Markov decision processes (FMDP) or tabular reinforcement learning with known dynamics
+Code for finite Markov decision processes (FMDP) or tabular reinforcement learning with known dynamics. The fact that we fully known the dynamics of the FMDP, allows us to estimate optimum policies.
 
 
 # Installation
 
 You can use
-python setup.py instal
+``python setup.py install``
 
 or directly set PYTHONPATH. For instance, on Windows
 
