@@ -14,3 +14,5 @@ or directly set PYTHONPATH. For instance, on Windows
 or Linux, using bash
 
 ``export PYTHONPATH=/home/user/github/tabular_rl/src``
+
+If you use VS Code and it is not finding the Python code, it may be useful to read https://stackoverflow.com/questions/53653083/how-to-correctly-set-pythonpath-for-visual-studio-code
