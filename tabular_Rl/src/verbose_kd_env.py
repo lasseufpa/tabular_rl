@@ -14,7 +14,7 @@ import numpy as np
 from random import choices, randint
 import gymnasium as gym
 from gymnasium import spaces
-from known_dynamics_env import KnownDynamicsEnv
+from tabular_Rl.src.known_dynamics_env import KnownDynamicsEnv
 
 
 class VerboseKnownDynamicsEnv(KnownDynamicsEnv):

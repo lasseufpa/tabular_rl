@@ -1,6 +1,6 @@
 import numpy as np
-from known_dynamics_env import KnownDynamicsEnv
-import finite_mdp_utils as fmdp
+from tabular_Rl.src.known_dynamics_env import KnownDynamicsEnv
+from tabular_Rl import finite_mdp_utils as fmdp
 
 
 def compute_optimal_state_values_nonsparse(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20) -> tuple[np.ndarray, int]:

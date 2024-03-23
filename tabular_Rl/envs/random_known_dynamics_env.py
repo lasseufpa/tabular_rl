@@ -1,6 +1,6 @@
-from known_dynamics_env import KnownDynamicsEnv
+from tabular_Rl.src.known_dynamics_env import KnownDynamicsEnv
 import numpy as np
-import finite_mdp_utils as fmdp
+from tabular_Rl import finite_mdp_utils as fmdp
 
 
 class RandomKnownDynamicsEnv(KnownDynamicsEnv):

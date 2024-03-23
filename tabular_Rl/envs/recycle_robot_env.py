@@ -1,8 +1,8 @@
 import numpy as np
 
-from verbose_kd_env import VerboseKnownDynamicsEnv
-import finite_mdp_utils as fmdp
-import optimum_values as optimum
+from tabular_Rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_Rl import finite_mdp_utils as fmdp
+import tabular_Rl.src.optimum_values as optimum
 
 
 class RecycleRobotEnv(VerboseKnownDynamicsEnv):
