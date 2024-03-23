@@ -19,7 +19,7 @@ easily converted into a policy.
 Aldebaro. Oct 25, 2023.
 '''
 from __future__ import print_function
-from tabular_Rl.src.known_dynamics_env import KnownDynamicsEnv
+from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 import numpy as np
 # from builtins import print
 from random import choices

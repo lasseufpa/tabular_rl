@@ -11,9 +11,9 @@ import sys
 # import gymnasium as gym
 # from gymnasium import spaces
 
-from tabular_Rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
-from tabular_Rl import finite_mdp_utils as fmdp
-import tabular_Rl.src.optimum_values as optimum
+from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_rl import finite_mdp_utils as fmdp
+import tabular_rl.src.optimum_values as optimum
 
 
 class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
