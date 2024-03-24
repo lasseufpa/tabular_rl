@@ -44,22 +44,28 @@ def get_space_dimensions_for_openai_gym(environment: gym.Env) -> tuple[int, int]
     return S, A
 
 
-def compute_state_values(env: gym.Env, policy: np.ndarray, in_place=False,
-                         discountGamma=0.9) -> tuple[np.ndarray, int]:
+def compute_state_values_via_policy_evaluation(env: KnownDynamicsEnv, policy: np.ndarray,
+                                               tolerance=1e-20,
+                                               discountGamma=0.9) -> tuple[np.ndarray, int]:
     '''
-    Iterative policy evaluation. Page 75 of [Sutton, 2018].
+    Iterative policy evaluation. Page 75 of [Sutton, 2020].
     Here a policy (not necessarily optimum) is provided.
-    It can generate, for instance, Fig. 3.2 in [Sutton, 2018]
+    It can generate, for instance, Fig. 3.2 in [Sutton, 2020].
+    It implements the in-place calculation as suggested
+    in [Sutton, 2020], page 75, which says:
+    "We usually have the in-place version in mind when we think of DP algorithms."
     '''
-    S = env.S
-    A = env.A
-    # (S, A, nS) = self.environment.nextStateProbability.shape
-    # A = len(actionListGivenIndex)
-    new_state_values = np.zeros((S,))
-    state_values = new_state_values.copy()
+    assert isinstance(
+        env, KnownDynamicsEnv)  # make sure env is a KnownDynamicsEnv
+
+    S = env.S  # num of states
+    A = env.A  # num of actions
+    state_values = np.zeros((S,))  # new_state_values.copy()
     iteration = 1
     while True:
-        src = new_state_values if in_place else state_values
+        # Initialize Delta in iterative policy evaluation algoritm, [Sutton, 2020], page 75
+        improvement_Delta = 0
+        # src = new_state_values if in_place else state_values
         for s in range(S):
             value = 0
             for a in range(A):
@@ -69,22 +75,22 @@ def compute_state_values(env: gym.Env, policy: np.ndarray, in_place=False,
                     p = env.nextStateProbability[s, a, nexts]
                     r = env.rewardsTable[s, a, nexts]
                     value += policy[s, a] * p * \
-                        (r + discountGamma * src[nexts])
+                        (r + discountGamma * state_values[nexts])
+                    # (r + discountGamma * src[nexts])
                     # value += p*(r+discount*src[nexts])
-            new_state_values[s] = value
-        # AK-TODO, Sutton, end of pag. 75 uses the max of individual entries, while
-        # here we are using the summation:
-        improvement = np.sum(np.abs(new_state_values - state_values))
-        # print('improvement =', improvement)
+            this_improvement = np.abs(value - state_values[s])
+            state_values[s] = value
+            # check if improvement_Delta needs to be updated
+            if this_improvement > improvement_Delta:
+                improvement_Delta = this_improvement
+
         if False:  # debug
             print('state values=', state_values)
-            print('new state values=', new_state_values)
-            print('it=', iteration, 'improvement = ', improvement)
-        if improvement < 1e-4:
-            state_values = new_state_values.copy()
+            print('it=', iteration, 'improvement = ', this_improvement)
+        if improvement_Delta <= tolerance:
             break
 
-        state_values = new_state_values.copy()
+        # state_values = new_state_values.copy()
         iteration += 1
 
     return state_values, iteration
@@ -456,14 +462,39 @@ if __name__ == '__main__':
 
     # test_dealing_with_sparsity()
 
-    values = np.array([[3, 5, -4, 2], [10, 10, 0, -20]])
-    policy = convert_action_values_into_policy(values)
-    print("values =", values)
-    print("policy =", policy)
-
     trajectory = np.array([1, 2, 3, 4, 5, 6])
     print("trajectory as an array=", trajectory)
     print("formatted trajectory:")
     print_trajectory(trajectory)
     # test_with_sparse_NextStateProbabilitiesEnv()
     # test_with_NextStateProbabilitiesEnv()
+
+    # define env with S=3 states and A=2 actions
+    # define an arbitrary policy
+    values = np.array([[3, 5], [10, 10], [10, 10]])
+    policy = convert_action_values_into_policy(values)
+    print("values =", values)
+    print("policy =", policy)
+
+    # continue defining the env
+    nextStateProbability = np.array([[[0.5, 0.5, 0],
+                                      [0.9, 0.1, 0]],
+                                     [[0, 0.5, 0.5],
+                                      [0, 0.2, 0.8]],
+                                     [[0, 0, 1],
+                                      [0, 0, 1]]])
+    rewardsTable = np.array([[[-3, 0, 0],
+                              [-2, 5, 5]],
+                             [[4, 5, 0],
+                              [2, 2, 6]],
+                             [[-8, 2, 80],
+                              [11, 0, 3]]])
+
+    env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
+    discountGamma = 0.8
+    tolerance = 0
+    # policy = get_uniform_policy_for_fully_connected(3, 2)
+    state_values, iteration = compute_state_values_via_policy_evaluation(env, policy, tolerance=tolerance,
+                                                                         discountGamma=discountGamma)
+    print('State_values via Policy Evaluation algorithm =', state_values)
+    print('Total number of iterations until convergence =', iteration)

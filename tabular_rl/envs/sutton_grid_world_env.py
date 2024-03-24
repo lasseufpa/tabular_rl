@@ -6,7 +6,7 @@
 # declaration at the top                                              #
 #######################################################################
 '''
-Implements the Grid World of Sutton & Barto's book, version 2018, with 550 pages:
+Implements the Grid World of Sutton & Barto's book, version 2020, with 550 pages:
 Example 3.5: Gridworld, pag. 60 and Example 3.8: Solving the Gridworld, pag. 65.
 Grid-world has 5 x 5 = 25 states.
 The states are numbered from top-left (state 0) to bottom-right (state 24) in
@@ -29,6 +29,7 @@ from random import choices, randint
 from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
 import tabular_rl.src.optimum_values as optimum
+
 
 class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
     '''
@@ -195,17 +196,17 @@ class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
 
 def reproduce_figures():
     '''
-    Reproduce Figures 3.2 and 3.5 from [Sutton, 2018], Examples 3.5 and 3.8, respectively.
+    Reproduce Figures 3.2 and 3.5 from [Sutton, 2020], Examples 3.5 and 3.8, respectively.
     '''
     env = SuttonGridWorldEnv()
 
     # get Fig. 3.5, which used a uniform policy
     equiprobable_policy = fmdp.get_uniform_policy_for_fully_connected(
         env.S, env.A)
-    state_values, iteration = fmdp.compute_state_values(
-        env, equiprobable_policy, in_place=True)
+    state_values, iteration = fmdp.compute_state_values_via_policy_evaluation(
+        env, equiprobable_policy, discountGamma=0.9)
     print(
-        'Reproducing Fig. 3.2 from [Sutton, 2018] with equiprobable random policy in page 60.')
+        'Reproducing Fig. 3.2 from [Sutton, 2020] with equiprobable random policy in page 60.')
     print('Figure 3.2 Gridworld example: exceptional reward dynamics (left) and state-value function for the equiprobable random policy (right).')
     print('Number of iterations = ', iteration)
     print('State values:')
@@ -213,7 +214,7 @@ def reproduce_figures():
 
     state_values, iteration = optimum.compute_optimal_state_values(env)
     print(
-        'Reproducing Fig. 3.5 from [Sutton, 2018] with optimum policy in page 65.')
+        'Reproducing Fig. 3.5 from [Sutton, 2020] with optimum policy in page 65.')
     print('Figure 3.5: Optimal solutions to the gridworld example')
     print('Number of iterations = ', iteration)
     print('State values:')

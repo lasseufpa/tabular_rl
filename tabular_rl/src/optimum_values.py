@@ -3,23 +3,43 @@ from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
 
 
-def compute_optimal_state_values_nonsparse(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20) -> tuple[np.ndarray, int]:
+def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20, use_sutton_version=True, use_nonsparse_version=False) -> tuple[np.ndarray, int]:
     '''
-    Compute the state value function v_*(s) via the Bellman optimality
-    equation for state values.
-    This is in page 63 of [Sutton, 2012], Eq. (3.19).
+    Compute the state value function v_*(s) via the Value Iteration algorithm,
+    which is described in Eq. (4.10) of [Sutton, 2020].
+    This algorithm is based on Bellman's optimality equation for state values,
+    which corresponds to Eq. (4.1) and also Eq. (3.19) in page 63 of [Sutton, 2020].
+    This is the public methods that calls the respective "private" method.
+    '''
+    assert isinstance(
+        env, KnownDynamicsEnv)  # make sure env is a KnownDynamicsEnv
+
+    if use_sutton_version:
+        return __compute_optimal_state_values_sparse_as_sutton(env, discountGamma=discountGamma, tolerance=tolerance)
+    elif use_nonsparse_version:
+        return __compute_optimal_state_values_nonsparse(env, discountGamma=discountGamma, tolerance=tolerance)
+    else:
+        return __compute_optimal_state_values_for_sparse_matrices(env, discountGamma=discountGamma, tolerance=tolerance)
+
+
+def __compute_optimal_state_values_nonsparse(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20) -> tuple[np.ndarray, int]:
+    '''
+    @see compute_optimal_state_values
+    This implementation uses a stopping criterion simply based on the
+    provided input parameter "tolerance", which is different than the criterion
+    suggested in [Sutton, 2020].
+    This version does not assume in-place computation.
     This version does not assume nor explore sparsity.'''
-    # assert isinstance(env, KnownDynamicsEnv)
-    S = env.S
-    A = env.A
-    # (S, A, nS) = env.nextStateProbability.shape
-    # A = len(actionListGivenIndex)
+
+    S = env.S  # total number of states
+    A = env.A  # total number of actions
+
     new_state_values = np.zeros((S,))
     state_values = np.zeros((S,))
     iteration = 1
     a_candidates = np.zeros((A,))
-    while True:
-        for s in range(S):
+    while True:  # until convergence
+        for s in range(S):  # implement a sweep over all possible states
             # fill with zeros without creating new array
             # a_candidates[:] = 0
             a_candidates.fill(0.0)
@@ -49,28 +69,22 @@ def compute_optimal_state_values_nonsparse(env: KnownDynamicsEnv, discountGamma=
     return state_values, iteration
 
 
-def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_nonsparse_version=False, tolerance=1e-20) -> tuple[np.ndarray, int]:
+def __compute_optimal_state_values_for_sparse_matrices(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20) -> tuple[np.ndarray, int]:
     '''
-    Compute the state value function v_*(s) via the Bellman optimality
-    equation for state values.
+    @see compute_optimal_state_values
     This version is useful when nextStateProbability is sparse. It only goes over the
     next states that are feasible.
-    Page 63 of [Sutton, 2018], Eq. (3.19)'''
-    if use_nonsparse_version:
-        return compute_optimal_state_values_nonsparse(env, discountGamma)
+    This version does not assume in-place computation.
+    '''
 
-    assert isinstance(env, KnownDynamicsEnv)
+    S = env.S  # total number of states
 
-    S = env.S
-
-    # (S, A, nS) = env.nextStateProbability.shape
-    # A = len(actionListGivenIndex)
     new_state_values = np.zeros((S,))
     state_values = np.zeros((S,))
     iteration = 1
     valid_next_states = env.valid_next_states
-    while True:
-        for s in range(S):
+    while True:  # until convergence
+        for s in range(S):  # implement a sweep over all possible states
 
             # Getting the Possible actions per state
             possibleAction = env.possible_actions_per_state[s]
@@ -96,7 +110,7 @@ def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_n
             new_state_values[s] = np.max(a_candidates)
         improvement = np.sum(np.abs(new_state_values - state_values))
         # print('improvement =', improvement)
-        if True:  # debug AK
+        if False:  # debug
             print('state values=', state_values)
             print('new state values=', new_state_values)
             print('it=', iteration, 'improvement = ', improvement)
@@ -104,6 +118,67 @@ def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_n
         for i in range(S):
             state_values[i] = new_state_values[i]
         if improvement <= tolerance:
+            break
+
+        iteration += 1
+
+    return state_values, iteration
+
+
+def __compute_optimal_state_values_sparse_as_sutton(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20) -> tuple[np.ndarray, int]:
+    '''
+    @see compute_optimal_state_values
+    This implementation adopts in-place calculation, as suggested
+    in [Sutton, 2020] textbook, page 75, which says:
+    "We usually have the in-place version in mind when we think of DP algorithms."
+    Besides, this version assumes the matrices are sparse.
+    '''
+    S = env.S  # total number of states
+
+    # new_state_values = np.zeros((S,))
+    state_values = np.zeros((S,))
+    iteration = 1
+    valid_next_states = env.valid_next_states
+    while True:  # until convergence
+        # Initialize Delta in Value Iteration algoritm, [Sutton, 2020], page 83
+        improvement_Delta = 0
+        for s in range(S):  # implement a sweep over all possible states
+            # Getting the Possible actions per state
+            possibleAction = env.possible_actions_per_state[s]
+            # Creating a array to compute the possibles actions
+            a_candidates = np.zeros(len(possibleAction))
+            # print(s)
+            # fill with zeros without creating new array
+            # a_candidates[:] = 0
+            a_candidates.fill(0.0)
+            feasible_next_states = valid_next_states[s]
+            num_of_feasible_next_states = len(feasible_next_states)
+            for a in possibleAction:
+                value = 0
+                # for nexts in range(S):
+                for feasible_nexts in range(num_of_feasible_next_states):
+                    # print('feasible_nexts=',feasible_nexts)
+                    nexts = feasible_next_states[feasible_nexts]
+                    p = env.nextStateProbability[s, a, nexts]
+                    r = env.rewardsTable[s, a, nexts]
+                    # print('p',p,'state_values[nexts]',state_values[nexts],'r',r)
+                    value += p * (r + discountGamma * state_values[nexts])
+                a_candidates[a] = value
+            # new_state_values[s] = np.max(a_candidates)
+            new_state_value = np.max(a_candidates)
+            this_improvement = np.abs(new_state_value - state_values[s])
+            state_values[s] = new_state_value
+            # check if improvement_Delta needs to be updated
+            if this_improvement > improvement_Delta:
+                improvement_Delta = this_improvement
+            # print('this_improvement  =', this_improvement)
+        if False:  # debug
+            print('state values=', state_values)
+            print('it=', iteration, 'max improvement = ', improvement_Delta)
+        # I am avoiding to use np.copy() here because memory kept growing
+        # for i in range(S):
+        #    state_values[i] = new_state_values[i]
+        if improvement_Delta <= tolerance:
             break
 
         iteration += 1
@@ -294,3 +369,84 @@ def compare_q_learning_with_optimum_policy(env: KnownDynamicsEnv,
 
         print("Wrote files", output_files_prefix + "_optimal.txt",
               "and", output_files_prefix + "_qlearning.txt.")
+
+
+def test_dealing_with_sparsity():
+    '''
+    When p[s,a,s'] is sparse, one should use
+    compute_optimal_state_values
+    instead of compute_optimal_state_values_nonsparse,
+    and compute_optimal_action_values instead of
+    compute_optimal_action_values_nonsparse
+    '''
+    # continue defining the env
+    nextStateProbability = np.array([[[0.5, 0.5, 0],
+                                      [0.9, 0.1, 0]],
+                                     [[0, 0.5, 0.5],
+                                      [0, 0.2, 0.8]],
+                                     [[0, 0, 1],
+                                      [0, 0, 1]]])
+    rewardsTable = np.array([[[-3, 0, 0],
+                              [-2, 5, 5]],
+                             [[4, 5, 0],
+                              [2, 2, 6]],
+                             [[-8, 2, 80],
+                              [11, 0, 3]]])
+
+    env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
+
+    use_nonsparse_version = True
+    state_values, iteration = compute_optimal_state_values(
+        env, use_nonsparse_version=use_nonsparse_version)
+    print("state_values=", state_values, 'using ', iteration, 'iterations')
+    use_nonsparse_version = False
+    state_values2, iteration = compute_optimal_state_values(
+        env, use_nonsparse_version=use_nonsparse_version)
+    print("state_values with sparsity=", state_values2,
+          'using ', iteration, 'iterations')
+    assert np.array_equal(state_values, state_values2)
+
+    action_values, stopping_criteria = compute_optimal_action_values_nonsparse(
+        env)
+    iteration = stopping_criteria.shape[0]
+    stopping_criterion = stopping_criteria[-1]
+    print("action_values=", action_values, 'using ', iteration, 'iterations')
+    print('Stopping criteria until convergence =', stopping_criteria)
+
+    action_values2, stopping_criteria = compute_optimal_action_values(
+        env)
+    iteration = stopping_criteria.shape[0]
+    stopping_criterion = stopping_criteria[-1]
+    print("action_values with sparsity=", action_values2, "converged with",
+          iteration, "iterations with stopping criterion=", stopping_criterion)
+    assert np.array_equal(action_values, action_values2)
+
+
+if __name__ == '__main__':
+    if False:
+        test_dealing_with_sparsity()
+
+    # define env
+    nextStateProbability = np.array([[[0.5, 0.5, 0],
+                                      [0.9, 0.1, 0]],
+                                     [[0, 0.5, 0.5],
+                                      [0, 0.2, 0.8]],
+                                     [[0, 0, 1],
+                                      [0, 0, 1]]])
+    rewardsTable = np.array([[[-3, 0, 0],
+                              [-2, 5, 5]],
+                             [[4, 5, 0],
+                              [2, 2, 6]],
+                             [[-8, 2, 80],
+                              [11, 0, 3]]])
+
+    env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
+    discountGamma = 0.8
+    tolerance = 0
+    use_nonsparse_version = True
+    use_sutton_version = False
+    state_values, iteration = compute_optimal_state_values(
+        env, discountGamma=discountGamma, tolerance=tolerance,
+        use_sutton_version=True, use_nonsparse_version=False)
+    print('Optimum state_values via Value Iteration=', state_values)
+    print('Total number of iterations until convergence =', iteration)
