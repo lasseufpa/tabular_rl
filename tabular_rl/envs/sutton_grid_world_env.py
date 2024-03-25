@@ -102,9 +102,9 @@ class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
 
         # top-left corner is [0, 0]
         A_POS = [0, 1]
-        A_PRIME_POS = [4, 1]
-        B_POS = [0, 3]
-        B_PRIME_POS = [2, 3]
+        A_PRIME_POS = [WORLD_SIZE-1, 1]
+        B_POS = [0, WORLD_SIZE-2]
+        B_PRIME_POS = [2, WORLD_SIZE-2]
 
         # left, up, right, down
         # actions = ['north', 'south', 'east', 'west'] #according to the book
@@ -199,6 +199,7 @@ def reproduce_figures():
     Reproduce Figures 3.2 and 3.5 from [Sutton, 2020], Examples 3.5 and 3.8, respectively.
     '''
     env = SuttonGridWorldEnv()
+    WORLD_SIZE = int(np.sqrt(env.S))
 
     # get Fig. 3.5, which used a uniform policy
     equiprobable_policy = fmdp.get_uniform_policy_for_fully_connected(
@@ -210,7 +211,7 @@ def reproduce_figures():
     print('Figure 3.2 Gridworld example: exceptional reward dynamics (left) and state-value function for the equiprobable random policy (right).')
     print('Number of iterations = ', iteration)
     print('State values:')
-    print(np.round(np.reshape(state_values, (5, 5)), 1))
+    print(np.round(np.reshape(state_values, (WORLD_SIZE, WORLD_SIZE)), 1))
 
     state_values, iteration = optimum.compute_optimal_state_values(env)
     print(
@@ -218,7 +219,7 @@ def reproduce_figures():
     print('Figure 3.5: Optimal solutions to the gridworld example')
     print('Number of iterations = ', iteration)
     print('State values:')
-    print(np.round(np.reshape(state_values, (5, 5)), 1))
+    print(np.round(np.reshape(state_values, (WORLD_SIZE, WORLD_SIZE)), 1))
 
     # use the value-based policy to obtain the \pi_star right subplot in Fig. 3.5.
     tolerance = 0  # execute until full convergence
