@@ -39,11 +39,11 @@ import itertools
 import pickle
 import os
 
-from tabular_Rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
-from tabular_Rl import finite_mdp_utils as fmdp
-import tabular_Rl.src.optimum_values as optimum
+from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_rl import finite_mdp_utils as fmdp
+import tabular_rl.src.optimum_values as optimum
 
-from tabular_Rl.src.mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
+from tabular_rl.src.mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
 
 
 class UserSchedulingEnv(VerboseKnownDynamicsEnv):
