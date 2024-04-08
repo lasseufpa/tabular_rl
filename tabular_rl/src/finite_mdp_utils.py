@@ -296,7 +296,7 @@ def q_learning_several_episodes(env: gym.Env,
             reward = q_learning_episode(env, stateActionValues,
                                         possible_actions_per_state,
                                         max_num_time_steps=max_num_time_steps_per_episode,
-                                        stepSizeAlpha=stepSizeAlpha, discountGamma=discountGamma
+                                        stepSizeAlpha=stepSizeAlpha, discountGamma=discountGamma,
                                         explorationProbEpsilon=explorationProbEpsilon)
             rewardsQLearning[i] += reward
             sum_rewards_this_run += reward
