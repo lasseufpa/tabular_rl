@@ -67,7 +67,7 @@ class KnownDynamicsEnv(gym.Env):
         self.nextStateProbability = nextStateProbability
         self.rewardsTable = rewardsTable  # expected rewards
         self.truncated = False
-        self.current_observation_or_state = 0
+        self.current_observation_or_state = np.array(0, dtype=np.int32)
 
         # (S, A, nS) = self.nextStateProbability.shape #should not require nextStateProbability, which is often unknown
         self.S = nextStateProbability.shape[0]  # number of states
@@ -85,8 +85,7 @@ class KnownDynamicsEnv(gym.Env):
 
         self.action_space = spaces.Discrete(self.A)
         # states are called observations in gym
-        #self.observation_space = spaces.Box(0,self.S-1, dtype=int)
-        self.observation_space = spaces.Discrete(self.S) 
+        self.observation_space = spaces.Box(0,self.S-1, dtype=int, shape=(1,))
         self.currentIteration = 0
         self.reset()
 
@@ -179,10 +178,10 @@ class KnownDynamicsEnv(gym.Env):
         self.currentIteration += 1  # update counter
         if self.currentIteration > 100:
             self.truncated = True
-        self.current_observation_or_state = nexts
+        self.current_observation_or_state = np.array(nexts, dtype=np.int32)
 
         # state is called observation in gym API
-        ob = nexts
+        ob = np.array(nexts, dtype=np.int32)
         return ob, float(reward), gameOver, self.truncated, history
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
@@ -206,8 +205,8 @@ class KnownDynamicsEnv(gym.Env):
         self.currentIteration = 0
         # note there are several versions of randint!
         self.current_observation_or_state = randint(0, self.S - 1)
-        aux[self.currentIteration] = self.current_observation_or_state
-        return self.current_observation_or_state
+
+        return np.array(self.current_observation_or_state, dtype=np.int32)
 
     def get_uniform_policy_for_known_dynamics(self):
         '''
