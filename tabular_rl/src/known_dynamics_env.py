@@ -85,8 +85,8 @@ class KnownDynamicsEnv(gym.Env):
 
         self.action_space = spaces.Discrete(self.A)
         # states are called observations in gym
-        self.observation_space = spaces.Box(0,2, dtype=int)
-
+        #self.observation_space = spaces.Box(0,self.S-1, dtype=int)
+        self.observation_space = spaces.Discrete(self.S) 
         self.currentIteration = 0
         self.reset()
 

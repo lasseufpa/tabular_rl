@@ -24,12 +24,6 @@ class SimpleKnownDynamicsEnv(KnownDynamicsEnv):
                                   [11, 0, 3]]])
         KnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable)
 
-    def reset(self) -> int:
-        # make sure initial state is 0
-        super().reset()
-        self.current_observation_or_state = 0
-        return self.current_observation_or_state
-
 
 if __name__ == "__main__":
     env = SimpleKnownDynamicsEnv()
