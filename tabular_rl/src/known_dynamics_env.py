@@ -58,8 +58,9 @@ import random
 from random import choices, randint
 import gym
 from gym import spaces
+from typing import Optional, Union
 
-class KnownDynamicsEnv(gym.Env):
+class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]])):
     def __init__(self, nextStateProbability, rewardsTable):
         #super(KnownDynamicsEnv, self).__init__()
         self.__version__ = "0.1.0"
