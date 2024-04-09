@@ -61,13 +61,13 @@ from gym import spaces
 
 class KnownDynamicsEnv(gym.Env):
     def __init__(self, nextStateProbability, rewardsTable):
-        super(KnownDynamicsEnv, self).__init__()
+        #super(KnownDynamicsEnv, self).__init__()
         self.__version__ = "0.1.0"
         # print("AK Finite MDP - Version {}".format(self.__version__))
         self.nextStateProbability = nextStateProbability
         self.rewardsTable = rewardsTable  # expected rewards
         self.truncated = False
-        self.current_observation_or_state = np.array(0, dtype=np.int32)
+        self.current_observation_or_state = None
 
         # (S, A, nS) = self.nextStateProbability.shape #should not require nextStateProbability, which is often unknown
         self.S = nextStateProbability.shape[0]  # number of states
@@ -88,6 +88,7 @@ class KnownDynamicsEnv(gym.Env):
         # states are called observations in gym
         self.observation_space = spaces.Box(Low,High, dtype=np.int32)
         self.currentIteration = 0
+        self.reset()
 
     def get_valid_next_actions(self):
         '''
@@ -182,7 +183,7 @@ class KnownDynamicsEnv(gym.Env):
 
         # state is called observation in gym API
         ob = np.array([nexts], dtype=np.int32)
-        return ob, float(reward), gameOver, history
+        return ob, float(reward), gameOver, False, {}
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
         '''This method can be overriden by subclass and process history'''
