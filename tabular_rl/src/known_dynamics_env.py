@@ -138,7 +138,7 @@ class KnownDynamicsEnv(gym.Env):
             valid_next_states[s] = list(valid_next_states[s])
         return valid_next_states
 
-    def step(self, action: int):
+    def step(self, action):
         """
         The agent takes a step in the environment.
         Parameters
@@ -177,8 +177,6 @@ class KnownDynamicsEnv(gym.Env):
         
         # update for next iteration
         self.currentIteration += 1  # update counter
-        if self.currentIteration > 100:
-            self.truncated = True
         self.current_observation_or_state = np.array([nexts], dtype=np.int32)
 
         # state is called observation in gym API
