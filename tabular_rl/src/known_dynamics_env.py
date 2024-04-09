@@ -88,7 +88,6 @@ class KnownDynamicsEnv(gym.Env):
         # states are called observations in gym
         self.observation_space = spaces.Box(Low,High, dtype=np.int32)
         self.currentIteration = 0
-        self.reset()
 
     def get_valid_next_actions(self):
         '''
@@ -201,13 +200,12 @@ class KnownDynamicsEnv(gym.Env):
         observation (object): the initial observation of the space.
         """
         aux = {}
-        if seed != None:
-            random.seed(seed)
+        super().reset(seed=seed)
         self.currentIteration = 0
         # note there are several versions of randint!
         self.current_observation_or_state = randint(0, self.S - 1)
 
-        return np.array([self.current_observation_or_state], dtype=np.int32), aux
+        return np.array([self.current_observation_or_state], dtype=np.int32), {}
 
     def get_uniform_policy_for_known_dynamics(self):
         '''
