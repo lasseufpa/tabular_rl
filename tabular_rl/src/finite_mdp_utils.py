@@ -23,8 +23,8 @@ from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 import numpy as np
 # from builtins import print
 from random import choices
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
 
 
 def check_if_fmdp(environment: gym.Env):

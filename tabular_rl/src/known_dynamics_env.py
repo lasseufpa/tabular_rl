@@ -56,8 +56,8 @@ from __future__ import absolute_import, division, print_function
 import numpy as np
 import random
 from random import choices, randint
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
 
 class KnownDynamicsEnv(gym.Env):
     def __init__(self, nextStateProbability, rewardsTable):
@@ -82,10 +82,11 @@ class KnownDynamicsEnv(gym.Env):
 
         # similar for states
         self.valid_next_states = self.get_valid_next_states()
-
+        Low = np.array([0], dtype=np.int32)
+        High = np.array([self.S-1], dtype=np.int32)
         self.action_space = spaces.Discrete(self.A)
         # states are called observations in gym
-        self.observation_space = spaces.Box(0,self.S-1, dtype=int, shape=(1,))
+        self.observation_space = spaces.Box(Low,High, dtype=np.int32)
         self.currentIteration = 0
         self.reset()
 
@@ -178,11 +179,11 @@ class KnownDynamicsEnv(gym.Env):
         self.currentIteration += 1  # update counter
         if self.currentIteration > 100:
             self.truncated = True
-        self.current_observation_or_state = np.array(nexts, dtype=np.int32)
+        self.current_observation_or_state = np.array([nexts], dtype=np.int32)
 
         # state is called observation in gym API
-        ob = np.array(nexts, dtype=np.int32)
-        return ob, float(reward), gameOver, self.truncated, history
+        ob = np.array([nexts], dtype=np.int32)
+        return ob, float(reward), gameOver, history
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
         '''This method can be overriden by subclass and process history'''
@@ -206,7 +207,7 @@ class KnownDynamicsEnv(gym.Env):
         # note there are several versions of randint!
         self.current_observation_or_state = randint(0, self.S - 1)
 
-        return np.array(self.current_observation_or_state, dtype=np.int32)
+        return np.array([self.current_observation_or_state], dtype=np.int32), aux
 
     def get_uniform_policy_for_known_dynamics(self):
         '''
@@ -246,8 +247,6 @@ class KnownDynamicsEnv(gym.Env):
 
 
 if __name__ == '__main__':
-    from stable_baselines3.common.env_checker import check_env
-
     print("Main:")
     nextStateProbability = np.array([[[0.5, 0.5, 0],
                                       [0.9, 0.1, 0]],
@@ -264,7 +263,5 @@ if __name__ == '__main__':
 
     env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
     
-    a = gym.register("test", "env")
-    print(gym.registry)
     #x = suite_gym.load("test")
     

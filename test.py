@@ -62,7 +62,7 @@ rewardsTable = np.array([[[-3, 0, 0],
 env = kd(nextStateProbability, rewardsTable)
 env = suite_gym.wrap_env(env)
 env_name = 'CartPole-v0'
-#env = suite_gym.load(env_name)
+env = suite_gym.load(env_name)
 
 
 train_env = tf_py_environment.TFPyEnvironment(env)
@@ -121,9 +121,11 @@ random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(),
 
 
 example_environment = tf_py_environment.TFPyEnvironment(
-    suite_gym.wrap_env(env))
-     
+    suite_gym.load(env_name))
+#b= example_environment.reset()
+#print(b)
+#a = example_environment.step(0)
+#print(a)
 time_step = example_environment.reset()
-print(time_step)
 random_policy.action(time_step)
      
