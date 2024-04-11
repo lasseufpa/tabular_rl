@@ -60,7 +60,7 @@ import gym
 from gym import spaces
 from typing import Optional, Union
 
-class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]])):
+class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
     def __init__(self, nextStateProbability, rewardsTable):
         #super(KnownDynamicsEnv, self).__init__()
         self.__version__ = "0.1.0"
@@ -156,13 +156,13 @@ class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]])):
         s = self.get_state()
 
         # check if the chosen action is within the set of valid actions for that state
-        valid_actions = self.possible_actions_per_state[s]
+        valid_actions = self.possible_actions_per_state[int(s)]
         if not (action in valid_actions):
             raise Exception("Action " + str(action) +
                             " is not in valid actions list: " + str(valid_actions))
 
         # find next state
-        weights = self.nextStateProbability[s, action]
+        weights = self.nextStateProbability[int(s), action]
         nexts = choices(self.possible_states, weights, k=1)[0]
 
         # find reward value
@@ -179,10 +179,11 @@ class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]])):
         # update for next iteration
         self.currentIteration += 1  # update counter
         self.current_observation_or_state = np.array([nexts], dtype=np.int32)
-
+        if self.currentIteration == 100:
+            gameOver = True 
         # state is called observation in gym API
         ob = np.array([nexts], dtype=np.int32)
-        return ob, float(reward), gameOver, False, {}
+        return ob, float(reward), gameOver, {}
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
         '''This method can be overriden by subclass and process history'''
@@ -205,7 +206,7 @@ class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]])):
         # note there are several versions of randint!
         self.current_observation_or_state = randint(0, self.S - 1)
 
-        return np.array([self.current_observation_or_state], dtype=np.int32), {}
+        return np.array([self.current_observation_or_state], dtype=np.int32)
 
     def get_uniform_policy_for_known_dynamics(self):
         '''

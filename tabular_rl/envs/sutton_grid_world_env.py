@@ -22,8 +22,8 @@ Modified by Aldebaro. 2023
 from __future__ import print_function
 import numpy as np
 import itertools
-import gymnasium
-from gymnasium import spaces
+import gym
+from gym import spaces
 from random import choices, randint
 
 from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv

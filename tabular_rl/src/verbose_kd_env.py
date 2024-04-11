@@ -12,8 +12,8 @@ the label information via the lists: stateListGivenIndex and actionListGivenInde
 '''
 import numpy as np
 from random import choices, randint
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
 from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 
 
