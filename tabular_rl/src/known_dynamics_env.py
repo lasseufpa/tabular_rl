@@ -183,7 +183,7 @@ class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
             gameOver = True 
         # state is called observation in gym API
         ob = np.array([nexts], dtype=np.int32)
-        return ob, float(reward), gameOver, {}
+        return ob, float(reward), gameOver, history
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
         '''This method can be overriden by subclass and process history'''
