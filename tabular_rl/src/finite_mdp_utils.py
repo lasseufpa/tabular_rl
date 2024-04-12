@@ -241,15 +241,14 @@ def action_greedy(state: int,
     '''
     Greedly choose an action with maximum value.
     '''
-    state = int(state)
-    values_for_given_state = stateActionValues[state]
+    values_for_given_state = stateActionValues[int(state)]
     if run_faster == True:
         # always return the first index with maximum value
         # this may create a problem for the agent to explore other options
         # or choose an invalid option
         max_index = np.argmax(values_for_given_state)
     else:
-        actions_for_given_state = possible_actions_per_state[state]
+        actions_for_given_state = possible_actions_per_state[int(state)]
         # make sure the action is valid, but keeping invalid actions with value=-infinity
         valid_values_for_given_state = -np.Inf * \
             np.ones(values_for_given_state.shape)
