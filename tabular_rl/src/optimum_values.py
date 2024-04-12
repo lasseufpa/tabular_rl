@@ -294,6 +294,7 @@ def compare_q_learning_with_optimum_policy(env: KnownDynamicsEnv,
 
         print("Wrote files", output_files_prefix + "_optimal.txt",
               "and", output_files_prefix + "_qlearning.txt.")
+    return((optimum_policy,optimal_rewards), (qlearning_policy, qlearning_rewards))
         
 if __name__ == '__main__':
     kd = KnownDynamicsEnv
