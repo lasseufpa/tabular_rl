@@ -49,7 +49,7 @@ def compute_optimal_state_values_nonsparse(env: KnownDynamicsEnv, discountGamma=
     return state_values, iteration
 
 
-def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_nonsparse_version=False, tolerance=1e-20) -> tuple[np.ndarray, int]:
+def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_nonsparse_version=False, tolerance=1e-20, debug =False) -> tuple[np.ndarray, int]:
     '''
     Compute the state value function v_*(s) via the Bellman optimality
     equation for state values.
@@ -96,7 +96,7 @@ def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, use_n
             new_state_values[s] = np.max(a_candidates)
         improvement = np.sum(np.abs(new_state_values - state_values))
         # print('improvement =', improvement)
-        if True:  # debug AK
+        if debug:  # debug AK
             print('state values=', state_values)
             print('new state values=', new_state_values)
             print('it=', iteration, 'improvement = ', improvement)
