@@ -225,9 +225,10 @@ def action_via_epsilon_greedy(state: int,
     '''
     Choose an action based on epsilon greedy algorithm.
     '''
+    
     if np.random.binomial(1, explorationProbEpsilon) == 1:
         # explore among valid options
-        return np.random.choice(possible_actions_per_state[state])
+        return np.random.choice(possible_actions_per_state[int(state)])
     else:
         # exploit, choosing an action with maximum value
         return action_greedy(state, stateActionValues, possible_actions_per_state, run_faster=run_faster)
@@ -240,6 +241,7 @@ def action_greedy(state: int,
     '''
     Greedly choose an action with maximum value.
     '''
+    state = int(state)
     values_for_given_state = stateActionValues[state]
     if run_faster == True:
         # always return the first index with maximum value

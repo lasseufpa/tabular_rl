@@ -294,3 +294,21 @@ def compare_q_learning_with_optimum_policy(env: KnownDynamicsEnv,
 
         print("Wrote files", output_files_prefix + "_optimal.txt",
               "and", output_files_prefix + "_qlearning.txt.")
+        
+if __name__ == '__main__':
+    kd = KnownDynamicsEnv
+    nextStateProbability = np.array([[[0.5, 0.5, 0],
+                                       [0.9, 0.1, 0]],
+                                      [[0, 0.5, 0.5],
+                                       [0, 0.2, 0.8]],
+                                      [[0, 0, 1],
+                                       [0, 0, 1]]])
+    rewardsTable = np.array([[[-3, 0, 0],
+                             [-2, 5, 5]],
+                            [[4, 5, 0],
+                             [2, 2, 6]],
+                            [[-8, 2, 80],
+                             [11, 0, 3]]])
+    env = kd(nextStateProbability, rewardsTable)
+    print(env.possible_actions_per_state[0])
+    compare_q_learning_with_optimum_policy(env)
