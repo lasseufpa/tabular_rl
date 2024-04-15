@@ -201,7 +201,7 @@ class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         observation (object): the initial observation of the space.
         """
         aux = {}
-        super().reset(seed=seed)
+        random.seed(seed)
         self.currentIteration = 0
         # note there are several versions of randint!
         self.current_observation_or_state = randint(0, self.S - 1)

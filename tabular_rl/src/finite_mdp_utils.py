@@ -117,17 +117,17 @@ def get_uniform_policy_for_fully_connected(S: int, A: int) -> np.ndarray:
     return policy
 
 
-def run_several_episodes(env: gym.Env, policy: np.ndarray, num_episodes=10, max_num_time_steps_per_episode=100, printInfo=False, printPostProcessingInfo=False) -> np.ndarray:
+def run_several_episodes(env: gym.Env, policy: np.ndarray, num_episodes=10, max_num_time_steps_per_episode=100, printInfo=False, printPostProcessingInfo=False, seed = None) -> np.ndarray:
     '''
     Runs num_episodes episodes and returns their rewards.'''
     rewards = np.zeros(num_episodes)
     for e in range(num_episodes):
         rewards[e] = run_episode(env, policy, maxNumIterations=max_num_time_steps_per_episode,
-                                 printInfo=printInfo, printPostProcessingInfo=printPostProcessingInfo)
+                                 printInfo=printInfo, printPostProcessingInfo=printPostProcessingInfo, seed = seed)
     return rewards
 
 
-def run_episode(env: gym.Env, policy: np.ndarray, maxNumIterations=100, printInfo=False, printPostProcessingInfo=False) -> int:
+def run_episode(env: gym.Env, policy: np.ndarray, maxNumIterations=100, printInfo=False, printPostProcessingInfo=False, seed = None) -> int:
     '''
     Reset and runs a complete episode for the environment env according to
     the specified policy.
