@@ -51,21 +51,24 @@ https://towardsdatascience.com/creating-a-custom-openai-gym-environment-for-stoc
 and
 https://gymnasium.farama.org/main/tutorials/environment_creation/
 '''
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
+import random
 from random import choices, randint
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
+from typing import Optional, Union
 
-
-class KnownDynamicsEnv(gym.Env):
+class KnownDynamicsEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
     def __init__(self, nextStateProbability, rewardsTable):
-        super(KnownDynamicsEnv, self).__init__()
+        #super(KnownDynamicsEnv, self).__init__()
         self.__version__ = "0.1.0"
         # print("AK Finite MDP - Version {}".format(self.__version__))
         self.nextStateProbability = nextStateProbability
         self.rewardsTable = rewardsTable  # expected rewards
-
-        self.current_observation_or_state = 0
+        self.truncated = False
+        self.current_observation_or_state = None
 
         # (S, A, nS) = self.nextStateProbability.shape #should not require nextStateProbability, which is often unknown
         self.S = nextStateProbability.shape[0]  # number of states
@@ -80,15 +83,15 @@ class KnownDynamicsEnv(gym.Env):
 
         # similar for states
         self.valid_next_states = self.get_valid_next_states()
-
+        Low = np.array([0], dtype=np.int32)
+        High = np.array([self.S-1], dtype=np.int32)
         self.action_space = spaces.Discrete(self.A)
         # states are called observations in gym
-        self.observation_space = spaces.Discrete(self.S)
-
+        self.observation_space = spaces.Box(Low,High, dtype=np.int32)
         self.currentIteration = 0
         self.reset()
 
-    def get_valid_next_actions(self) -> list:
+    def get_valid_next_actions(self):
         '''
         Pre-compute valid next actions.
         Recall that the 3-D array nextStateProbability indicates p(s'/s,a),
@@ -113,7 +116,7 @@ class KnownDynamicsEnv(gym.Env):
                     possible_actions_per_state[s].append(a)
         return possible_actions_per_state
 
-    def get_valid_next_states(self) -> list:
+    def get_valid_next_states(self):
         '''
         Pre-compute valid next states.
         See @get_valid_next_actions
@@ -136,7 +139,7 @@ class KnownDynamicsEnv(gym.Env):
             valid_next_states[s] = list(valid_next_states[s])
         return valid_next_states
 
-    def step(self, action: int):
+    def step(self, action):
         """
         The agent takes a step in the environment.
         Parameters
@@ -153,13 +156,13 @@ class KnownDynamicsEnv(gym.Env):
         s = self.get_state()
 
         # check if the chosen action is within the set of valid actions for that state
-        valid_actions = self.possible_actions_per_state[s]
+        valid_actions = self.possible_actions_per_state[int(s)]
         if not (action in valid_actions):
             raise Exception("Action " + str(action) +
                             " is not in valid actions list: " + str(valid_actions))
 
         # find next state
-        weights = self.nextStateProbability[s, action]
+        weights = self.nextStateProbability[int(s), action]
         nexts = choices(self.possible_states, weights, k=1)[0]
 
         # find reward value
@@ -172,36 +175,40 @@ class KnownDynamicsEnv(gym.Env):
         #           "reward_tp1": reward, "state_tp1": self.stateListGivenIndex[nexts]}
         history = {"time": self.currentIteration, "state_t": s, "action_t": action,
                    "reward_tp1": reward, "state_tp1": nexts}
-
+        
         # update for next iteration
         self.currentIteration += 1  # update counter
-        self.current_observation_or_state = nexts
-
+        self.current_observation_or_state = np.array([nexts], dtype=np.int32)
+        if self.currentIteration == 100:
+            gameOver = True 
         # state is called observation in gym API
-        ob = nexts
-        return ob, reward, gameOver, history
+        ob = np.array([nexts], dtype=np.int32)
+        return ob, float(reward), gameOver, {}
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
         '''This method can be overriden by subclass and process history'''
         pass  # no need to do anything here
 
-    def get_state(self) -> int:
+    def get_state(self):
         """Get the current observation."""
         return self.current_observation_or_state
 
-    def reset(self) -> int:
+    def reset(self, seed = None):
         """
         Reset the state of the environment and returns an initial observation.
         Returns
         -------
         observation (object): the initial observation of the space.
         """
+        aux = {}
+        super().reset(seed=seed)
         self.currentIteration = 0
         # note there are several versions of randint!
         self.current_observation_or_state = randint(0, self.S - 1)
-        return self.current_observation_or_state
 
-    def get_uniform_policy_for_known_dynamics(self) -> np.ndarray:
+        return np.array([self.current_observation_or_state], dtype=np.int32)
+
+    def get_uniform_policy_for_known_dynamics(self):
         '''
         Takes in account the dynamics of the defined environment
         when defining actions that can be performed at each state.
@@ -254,4 +261,6 @@ if __name__ == '__main__':
                               [11, 0, 3]]])
 
     env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
-    print(env.step(1))
+    
+    #x = suite_gym.load("test")
+    
