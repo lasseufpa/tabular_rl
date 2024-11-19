@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+**/*.pkl
+**/*.pickle
+tabular_rl.egg-info/
+
 # C extensions
 *.so
 
