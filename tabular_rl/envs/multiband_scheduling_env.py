@@ -8,8 +8,6 @@ It assumes knowledge of the correct nextStateProbability such that it allows to 
 import numpy as np
 import itertools
 import sys
-# import gymnasium as gym
-# from gymnasium import spaces
 
 from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp

@@ -22,13 +22,9 @@ Modified by Aldebaro. 2023
 from __future__ import print_function
 import numpy as np
 import itertools
-import gymnasium
-from gymnasium import spaces
-from random import choices, randint
-
+import tabular_rl.src.optimum_values as optimum
 from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
-import tabular_rl.src.optimum_values as optimum
 
 
 class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
@@ -204,7 +200,7 @@ def reproduce_figures():
     # get Fig. 3.5, which used a uniform policy
     equiprobable_policy = fmdp.get_uniform_policy_for_fully_connected(
         env.S, env.A)
-    state_values, iteration = fmdp.compute_state_values_via_policy_evaluation(
+    state_values, iteration = fmdp.compute_state_values(
         env, equiprobable_policy, discountGamma=0.9)
     print(
         'Reproducing Fig. 3.2 from [Sutton, 2020] with equiprobable random policy in page 60.')

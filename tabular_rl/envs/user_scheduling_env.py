@@ -38,11 +38,10 @@ import numpy as np
 import itertools
 import pickle
 import os
+import tabular_rl.src.optimum_values as optimum
 
 from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
-import tabular_rl.src.optimum_values as optimum
-
 from tabular_rl.src.mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
 
 
@@ -410,7 +409,7 @@ if __name__ == '__main__':
 
     # try one step
     action = 0
-    ob, reward, gameOver, history = env.step(action)
+    ob, reward, gameOver, truncade, history = env.step(action)
     printPostProcessingInfo = True
     env.postprocessing_MDP_step(history, printPostProcessingInfo)
 

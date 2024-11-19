@@ -12,8 +12,6 @@ the label information via the lists: stateListGivenIndex and actionListGivenInde
 '''
 import numpy as np
 from random import choices, randint
-import gymnasium as gym
-from gymnasium import spaces
 from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 
 
@@ -42,15 +40,16 @@ class VerboseKnownDynamicsEnv(KnownDynamicsEnv):
             self.stateListGivenIndex = states_info[1]
 
     def step(self, action: int):
-        ob, reward, gameOver, history = super().step(action)
+        ob, reward, gameOver, truncated, history = super().step(action)
         # convert history to a more pleasant version
-        s = history["state_t"]
+        s = int(history["state_t"])
         action = history["action_t"]
         nexts = history["state_tp1"]
         # history version with actions and states, not their indices
         history = {"time": self.currentIteration, "state_t": self.stateListGivenIndex[s], "action_t": self.actionListGivenIndex[action],
                    "reward_tp1": reward, "state_tp1": self.stateListGivenIndex[nexts]}
-        return ob, reward, gameOver, history
+        
+        return ob, reward, gameOver, truncated, history
 
     def pretty_print_policy(self, policy: np.ndarray):
         '''

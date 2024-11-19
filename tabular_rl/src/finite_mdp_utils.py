@@ -19,13 +19,11 @@ easily converted into a policy.
 Aldebaro. Oct 25, 2023.
 '''
 from __future__ import print_function
-from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 import numpy as np
-# from builtins import print
+import gymnasium as gym
 from random import choices
-import gym
-from gym import spaces
-
+from gymnasium import spaces
+from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
 
 def check_if_fmdp(environment: gym.Env):
     # checks if env is a FMDP gym with discrete spaces
@@ -149,7 +147,7 @@ def run_episode(env: gym.Env, policy: np.ndarray, maxNumIterations=100, printInf
                 "Warning: reached state that does not have a valid action to take. Ending the episode")
             break
         action = choices(list_of_actions, weights=policy_weights, k=1)[0]
-        ob, reward, gameOver, history = env.step(action)
+        ob, reward, gameOver,truncade, history = env.step(action)
 
         # assume the user may want to apply some postprocessing step, similar to a callback function
         env.postprocessing_MDP_step(history, printPostProcessingInfo)
@@ -205,7 +203,7 @@ def q_learning_episode(env: gym.Env,
                                                   explorationProbEpsilon=explorationProbEpsilon,
                                                   run_faster=False)
 
-        newState, reward, gameOver, history = env.step(currentAction)
+        newState, reward, gameOver, truncade, history = env.step(currentAction)
         rewards += reward
         # Q-Learning update
         stateActionValues[currentState, currentAction] += stepSizeAlpha * (
@@ -250,7 +248,7 @@ def action_greedy(state: int,
     else:
         actions_for_given_state = possible_actions_per_state[int(state)]
         # make sure the action is valid, but keeping invalid actions with value=-infinity
-        valid_values_for_given_state = -np.Inf * \
+        valid_values_for_given_state = -np.inf * \
             np.ones(values_for_given_state.shape)
         valid_values_for_given_state[actions_for_given_state] = values_for_given_state[actions_for_given_state]
         max_value = np.max(valid_values_for_given_state)
@@ -288,7 +286,7 @@ def q_learning_several_episodes(env: gym.Env,
     # shows convergence over episodes
     rewardsQLearning = np.zeros(episodes_per_run)
     best_stateActionValues = np.zeros((env.S, env.A))  # store best over runs
-    largest_reward = -np.Inf  # initialize with negative value
+    largest_reward = -np.inf  # initialize with negative value
     for run in range(num_runs):
         stateActionValues = np.zeros((env.S, env.A))  # reset for each run
         sum_rewards_this_run = 0
@@ -354,7 +352,8 @@ def generate_trajectory(env: gym.Env, policy: np.ndarray, num_steps: int) -> tup
         # choose action according to the policy
         taken_actions[t] = choices(
             list_of_actions, weights=policy[states[t]])[0]
-        ob, reward, gameOver, history = env.step(taken_actions[t])
+        ob, reward, gameOver,truncated, history = env.step(taken_actions[t])
+        print(history)
         # at time t=0 one obtains the reward for t=1 (convention of Sutton's book)
         rewards_tp1[t] = reward
     return taken_actions, rewards_tp1, states

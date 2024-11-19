@@ -55,13 +55,11 @@ from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import random
-import gymnasium as gym
-
 from random import choices, randint
+import gymnasium as gym
 from gymnasium import spaces
-from typing import Optional, Union
 
-class KnownDynamicsEnv(gym.Env):
+class dqnEnvClass(gym.Env):
     def __init__(self, nextStateProbability, rewardsTable):
         #super(KnownDynamicsEnv, self).__init__()
         self.__version__ = "0.1.0"
@@ -81,14 +79,14 @@ class KnownDynamicsEnv(gym.Env):
         # we need to indicate only valid actions for each state
         # create a list of lists, that indicates for each state, the list of allowed actions
         self.possible_actions_per_state = self.get_valid_next_actions()
-
+    
         # similar for states
         self.valid_next_states = self.get_valid_next_states()
-        Low = np.array([0], dtype=np.int32)
-        High = np.array([self.S-1], dtype=np.int32)
+        Low = np.array(np.zeros(self.S), dtype=np.int32)
+        High = np.array(np.ones(self.S), dtype=np.int32)
         self.action_space = spaces.Discrete(self.A)
         # states are called observations in gym
-        self.observation_space = spaces.Discrete(self.S)
+        self.observation_space = spaces.Box(Low,High, dtype=np.int8)
         self.currentIteration = 0
         self.reset()
 
@@ -156,35 +154,38 @@ class KnownDynamicsEnv(gym.Env):
         """
         s = self.get_state()
 
+        #print(self.current_observation_or_state)
         # check if the chosen action is within the set of valid actions for that state
-        valid_actions = self.possible_actions_per_state[int(s)]
+        valid_actions = self.possible_actions_per_state[np.argmax(s)]
         if not (action in valid_actions):
-            raise Exception("Action " + str(action) +
-                            " is not in valid actions list: " + str(valid_actions))
+            self.current_observation_or_state = s
+            reward = 0
+            hist = {}
+            gameOver = True
+            
+        else:
+            # find next state
+            weights = self.nextStateProbability[np.argmax(s), action]
+            nexts = choices(self.possible_states, weights, k=1)[0]
+            nState = np.zeros(self.S)
+            nState[nexts] = 1
+            # find reward value
+            reward = self.rewardsTable[np.argmax(s), action, nexts]
 
-        # find next state
-        weights = self.nextStateProbability[int(s), action]
-        nexts = choices(self.possible_states, weights, k=1)[0]
+            gameOver = False  # this is a continuing FMDP that never ends
 
-        # find reward value
-        reward = self.rewardsTable[s, action, nexts]
+            # history version with actions and states, not their indices
+            # history = {"time": self.currentIteration, "state_t": self.stateListGivenIndex[s], "action_t": self.actionListGivenIndex[action],
+            #           "reward_tp1": reward, "state_tp1": self.stateListGivenIndex[nexts]}
+            history = {"time": self.currentIteration, "state_t": s, "action_t": action,
+                       "reward_tp1": reward, "state_tp1": nexts}
 
-        gameOver = False  # this is a continuing FMDP that never ends
-        Truncated = False
-        # history version with actions and states, not their indices
-        # history = {"time": self.currentIteration, "state_t": self.stateListGivenIndex[s], "action_t": self.actionListGivenIndex[action],
-        #           "reward_tp1": reward, "state_tp1": self.stateListGivenIndex[nexts]}
-        history = {"time": self.currentIteration, "state_t": s, "action_t": action,
-                   "reward_tp1": reward, "state_tp1": nexts}
-        
-        # update for next iteration
+            self.current_observation_or_state = nState
+    
+        #if self.currentIteration == 100:
+        #    gameOver = True 
         self.currentIteration += 1  # update counter
-        self.current_observation_or_state = np.array([nexts], dtype=np.int32)
-        if self.currentIteration == 100:
-            Truncated = True 
-        # state is called observation in gym API
-        ob = np.array([nexts], dtype=np.int32)
-        return ob, float(reward), gameOver, Truncated, history
+        return self.current_observation_or_state, float(reward), gameOver, gameOver, history
 
     def postprocessing_MDP_step(env, history: dict, printPostProcessingInfo: bool):
         '''This method can be overriden by subclass and process history'''
@@ -194,23 +195,23 @@ class KnownDynamicsEnv(gym.Env):
         """Get the current observation."""
         return self.current_observation_or_state
 
-    def reset(self, s = None, seed = None):
+    def reset(self, seed = None):
         """
         Reset the state of the environment and returns an initial observation.
         Returns
         -------
         observation (object): the initial observation of the space.
         """
-        random.seed(seed)
+        aux = {}
+        #super().reset(seed=seed)
         self.currentIteration = 0
-        if s != None:
-            self.current_observation_or_state = s
-        else:    
-            # note there are several versions of randint!
-            self.current_observation_or_state = randint(0, self.S - 1)
+        # note there are several versions of randint!
+        random.seed(seed)
+        state = np.zeros(self.S)
+        state[randint(0, self.S - 1)] = 1
+        self.current_observation_or_state = state
         random.seed(None)
-
-        return np.array([self.current_observation_or_state], dtype=np.int32), {}
+        return self.current_observation_or_state, {}
 
     def get_uniform_policy_for_known_dynamics(self):
         '''
@@ -265,8 +266,6 @@ if __name__ == '__main__':
                               [11, 0, 3]]])
 
     env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
-    env.reset()
-    print(env.current_observation_or_state)
-    print(env.step(0))
+    
     #x = suite_gym.load("test")
     
