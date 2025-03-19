@@ -1,9 +1,9 @@
 import numpy as np
 
-from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
 import tabular_rl.src.optimum_values as optimum
-
+from tabular_rl.src.class_vi import VI_agent as VI
 
 class RecycleRobotEnv(VerboseKnownDynamicsEnv):
     def __init__(self):
@@ -12,12 +12,12 @@ class RecycleRobotEnv(VerboseKnownDynamicsEnv):
         nextStateProbability, rewardsTable = self.recycle_robot_matrices()
 
         # create data structures (dic and list) to map names into indices for actions
-        actionDictionaryGetIndex, actionListGivenIndex = self.createActionsDataStructures()
-        actions_info = [actionDictionaryGetIndex, actionListGivenIndex]
+        actionDictionaryGetIndex, actionListGivenIndex, actcomp = self.createActionsDataStructures()
+        actions_info = [actionDictionaryGetIndex, actionListGivenIndex, actcomp]
 
         # create data structures (dic and list) to map names into indices for states
-        stateDictionaryGetIndex, stateListGivenIndex = self.createStatesDataStructures()
-        states_info = [stateDictionaryGetIndex, stateListGivenIndex]
+        stateDictionaryGetIndex, stateListGivenIndex, statecomp = self.createStatesDataStructures()
+        states_info = [stateDictionaryGetIndex, stateListGivenIndex, statecomp]
 
         # superclass constructor
         VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
@@ -50,6 +50,8 @@ class RecycleRobotEnv(VerboseKnownDynamicsEnv):
         nextStateProbability[low, wait, low] = 1
         nextStateProbability[low, recharge, high] = 1
         nextStateProbability[low, recharge, low] = 0
+        nextStateProbability[0,2, 1] = 0.5
+        nextStateProbability[0,2, 0] = 0.5
 
         rewardsTable = np.zeros([S, A, S])  # these rewards can be negative
         rewardsTable[high, search, high] = rsearch
@@ -75,7 +77,8 @@ class RecycleRobotEnv(VerboseKnownDynamicsEnv):
         for uniqueIndex in range(len(possibleActions)):
             dictionaryGetIndex[possibleActions[uniqueIndex]] = uniqueIndex
             listGivenIndex.append(possibleActions[uniqueIndex])
-        return dictionaryGetIndex, listGivenIndex
+        
+        return dictionaryGetIndex, listGivenIndex, possibleActions
 
     def createStatesDataStructures(self):
         '''
@@ -90,7 +93,7 @@ class RecycleRobotEnv(VerboseKnownDynamicsEnv):
         for uniqueIndex in range(len(possibleStates)):
             dictionaryGetIndex[possibleStates[uniqueIndex]] = uniqueIndex
             listGivenIndex.append(possibleStates[uniqueIndex])
-        return dictionaryGetIndex, listGivenIndex
+        return dictionaryGetIndex, listGivenIndex, possibleStates
 
 
 if __name__ == "__main__":
@@ -98,11 +101,11 @@ if __name__ == "__main__":
     print("About environment:")
     print("Num of states =", env.S)
     print("Num of actions =", env.A)
-    print("env.possible_actions_per_state =", env.possible_actions_per_state)
+    #print("env.possible_actions_per_state =", env.possible_actions_per_state)
     print("env.nextStateProbability =", env.nextStateProbability)
     print("env.rewardsTable =", env.rewardsTable)
 
-    uniform_policy = env.get_uniform_policy_for_known_dynamics()
+    uniform_policy = fmdp.get_uniform_policy_for_fully_connected(env.S, env.A)
     num_steps = 10
     taken_actions, rewards_tp1, states = fmdp.generate_trajectory(
         env, uniform_policy, num_steps)
@@ -114,9 +117,11 @@ if __name__ == "__main__":
     fmdp.print_trajectory(trajectory)
 
     tolerance = 0
-    state_values, iteration = optimum.compute_optimal_state_values(
-        env, tolerance=tolerance)
+    VI_agent = VI(env, tolerance=tolerance)
+    state_values = VI_agent.get_vf()
+    iteration = len(VI_agent.hist)
     print('Optimal solutions to the recycle robot example')
     print('Number of iterations = ', iteration)
     print('State values:')
+    print(state_values)
     print(np.round(state_values, 4))

@@ -40,10 +40,11 @@ import pickle
 import os
 import tabular_rl.src.optimum_values as optimum
 
-from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
 from tabular_rl.src.mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
-
+from tabular_rl.src.class_vi import VI_agent as VI
+from tabular_rl.src.class_qlearning import Qlearning_agent as QL
 
 class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
@@ -62,14 +63,15 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.actions_move = one_step_moves_in_grid(
             should_add_not_moving=should_add_not_moving)
 
-        self.indexGivenActionDictionary, self.actionGivenIndexList = createActionsDataStructures(
+        self.indexGivenActionDictionary, self.actionGivenIndexList, actcomp = createActionsDataStructures(
             self.Nu)
         self.A = len(self.actionGivenIndexList)
-
-        self.indexGivenStateDictionary, self.stateGivenIndexList = createStatesDataStructures(
+        
+        self.indexGivenStateDictionary, self.stateGivenIndexList, statecomp = createStatesDataStructures(
             self.actions_move, G=self.G, Nu=self.Nu, B=self.B, can_users_share_position=can_users_share_position,
             show_debug_info=self.print_debug_info)
 
+        print(self.indexGivenStateDictionary)
         self.S = len(self.stateGivenIndexList)
 
         # self.ues_pos_prob, self.channel_spectral_efficiencies, self.ues_valid_actions = self.read_external_files()
@@ -89,14 +91,16 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
         # pack data structures (dic and list) to map names into indices for actions
         actions_info = [self.indexGivenActionDictionary,
-                        self.actionGivenIndexList]
+                        self.actionGivenIndexList,
+                        actcomp]
 
         # pack data structures (dic and list) to map names into indices for states
         states_info = [self.indexGivenStateDictionary,
-                       self.stateGivenIndexList]
+                       self.stateGivenIndexList,
+                       statecomp]
 
         # call superclass constructor
-        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=1,
                                          actions_info=actions_info, states_info=states_info)
         if self.print_debug_info:
             print("INFO: finished creating environment")
@@ -284,7 +288,7 @@ def createActionsDataStructures(Nu) -> tuple[dict, list]:
     for uniqueIndex in range(len(possibleActions)):
         dictionaryGetIndex[possibleActions[uniqueIndex]] = uniqueIndex
         listGivenIndex.append(possibleActions[uniqueIndex])
-    return dictionaryGetIndex, listGivenIndex
+    return dictionaryGetIndex, listGivenIndex, possibleActions
 
 
 def init_next_state_probability():
@@ -362,7 +366,9 @@ def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_sha
     if False:
         print('indexGivenStateDictionary = ', indexGivenStateDictionary)
         print('stateGivenIndexList = ', stateGivenIndexList)
-    return indexGivenStateDictionary, stateGivenIndexList
+    names = ["position","buffer"]
+    
+    return indexGivenStateDictionary, stateGivenIndexList, names
 
 
 def check_matrix(nextStateProbability):
@@ -401,20 +407,15 @@ if __name__ == '__main__':
             print_debug_info=True)  # G is the grid size
         pickle.dump(env, open(file_path, "wb"))
 
-    # env.prettyPrint()
-    # check_matrix(env.nextStateProbability) # it was ok
 
-    print("Example of action:", env.actionListGivenIndex[0])
-    print("Example of state:", env.stateListGivenIndex[30])
+    #env.postprocessing_MDP_step(history, printPostProcessingInfo)
+    print(env.get_dynamics()[0].shape)
+    agent_vi = VI(env)
+    agent_ql = QL(env)
 
-    # try one step
-    action = 0
-    ob, reward, gameOver, truncade, history = env.step(action)
-    printPostProcessingInfo = True
-    env.postprocessing_MDP_step(history, printPostProcessingInfo)
 
     if True:
-        optimum.compare_q_learning_with_optimum_policy(env)
-    if True:
+        fmdp.compare_qlearning_VI(env, agent_vi, agent_ql)
+    if False:
         # this may take long time to run
         fmdp.hyperparameter_grid_search(env)

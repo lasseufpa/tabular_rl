@@ -23,8 +23,10 @@ from __future__ import print_function
 import numpy as np
 import itertools
 import tabular_rl.src.optimum_values as optimum
-from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
+from tabular_rl.src.class_vi import VI_agent as VI
+from tabular_rl.src.class_qlearning import Qlearning_agent as QL
 
 
 class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
@@ -39,20 +41,21 @@ class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
         WORLD_SIZE = 5  # grid is WORLD_SIZE x WORLD_SIZE
 
         # create data structures (dic and list) to map names into indices for actions
-        actionDictionaryGetIndex, actionListGivenIndex = self.createActionsDataStructures()
-        actions_info = [actionDictionaryGetIndex, actionListGivenIndex]
+        actionDictionaryGetIndex, actionListGivenIndex, actcomp = self.createActionsDataStructures()
+        actions_info = [actionDictionaryGetIndex, actionListGivenIndex, actcomp]
 
         # create data structures (dic and list) to map names into indices for states
-        stateDictionaryGetIndex, stateListGivenIndex = self.createStatesDataStructures(
+        stateDictionaryGetIndex, stateListGivenIndex, statecomp = self.createStatesDataStructures(
             WORLD_SIZE)
-        states_info = [stateDictionaryGetIndex, stateListGivenIndex]
+        states_info = [stateDictionaryGetIndex, stateListGivenIndex, statecomp]
+        print(stateDictionaryGetIndex)
 
         # create the environment
         nextStateProbability, rewardsTable = self.create_environment(
             WORLD_SIZE, stateDictionaryGetIndex)
 
         # superclass constructor
-        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=1,
                                          actions_info=actions_info, states_info=states_info)
 
     def postprocessing_MDP_step(self, history, printPostProcessingInfo):
@@ -70,7 +73,7 @@ class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
         for uniqueIndex in range(len(possibleActions)):
             dictionaryGetIndex[possibleActions[uniqueIndex]] = uniqueIndex
             listGivenIndex.append(possibleActions[uniqueIndex])
-        return dictionaryGetIndex, listGivenIndex
+        return dictionaryGetIndex, listGivenIndex,possibleActions
 
     def createStatesDataStructures(self, WORLD_SIZE):
         '''
@@ -91,7 +94,8 @@ class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):
         if False:
             print('stateDictionaryGetIndex = ', stateDictionaryGetIndex)
             print('stateListGivenIndex = ', stateListGivenIndex)
-        return stateDictionaryGetIndex, stateListGivenIndex
+        name = ["posx", "posy"]
+        return stateDictionaryGetIndex, stateListGivenIndex, name
 
     def create_environment(self, WORLD_SIZE, stateDictionaryGetIndex):
         '''Define the MDP process. Overrides default method from superclass.'''
@@ -208,8 +212,10 @@ def reproduce_figures():
     print('Number of iterations = ', iteration)
     print('State values:')
     print(np.round(np.reshape(state_values, (WORLD_SIZE, WORLD_SIZE)), 1))
-
-    state_values, iteration = optimum.compute_optimal_state_values(env)
+    tolerance = 0 
+    vi_agent = VI(env, tolerance=0)
+    state_values = vi_agent.get_vf()
+    iteration = len(vi_agent.hist)
     print(
         'Reproducing Fig. 3.5 from [Sutton, 2020] with optimum policy in page 65.')
     print('Figure 3.5: Optimal solutions to the gridworld example')
@@ -218,9 +224,9 @@ def reproduce_figures():
     print(np.round(np.reshape(state_values, (WORLD_SIZE, WORLD_SIZE)), 1))
 
     # use the value-based policy to obtain the \pi_star right subplot in Fig. 3.5.
-    tolerance = 0  # execute until full convergence
-    action_values, stopping_criteria = optimum.compute_optimal_action_values(
-        env, tolerance=tolerance)
+     # execute until full convergence
+    action_values = vi_agent.Q_table
+    stopping_criteria = vi_agent.hist
     print('Stopping criteria until convergence =', stopping_criteria)
 
     if False:  # this is not shown in Fig. 3.5, but you can visualize action_values if you wish
@@ -236,12 +242,14 @@ if __name__ == '__main__':
     reproduce_figures()  # From Sutton's book
 
     env = SuttonGridWorldEnv()
+    vi_agent=VI(env)
+    ql_agent = QL(env)
     # This is a continuing (not episodic) process. It never ends.
     # we needed around 500000 Q-learning updates for finding optimum policy
     total_number_of_updates = 500000
     num_episodes = 500
     max_num_time_steps_per_episode = total_number_of_updates // num_episodes
-    optimum.compare_q_learning_with_optimum_policy(env,
-                                                   max_num_time_steps_per_episode=max_num_time_steps_per_episode,
-                                                   num_episodes=num_episodes,
-                                                   explorationProbEpsilon=0.2)
+    fmdp.compare_qlearning_VI(env,vi_agent,ql_agent, 
+                              max_num_time_steps_per_episode=max_num_time_steps_per_episode,
+                              num_episodes=num_episodes,
+                              explorationProbEpsilon=0.2)

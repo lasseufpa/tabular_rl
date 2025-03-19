@@ -1,5 +1,6 @@
 import numpy as np
-from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
+from scipy.optimize import fsolve
+from tabular_rl.src.knowm_dynamics_env import KnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
 
 
@@ -315,7 +316,7 @@ def compute_optimal_action_values(env: KnownDynamicsEnv,
     return action_values, np.array(stopping_criteria_per_iteration)
 
 
-def compare_q_learning_with_optimum_policy(env: KnownDynamicsEnv,
+def compare_policys(env: KnownDynamicsEnv,
                                            max_num_time_steps_per_episode=100,
                                            num_episodes=10,
                                            explorationProbEpsilon=0.2,
@@ -371,55 +372,6 @@ def compare_q_learning_with_optimum_policy(env: KnownDynamicsEnv,
               "and", output_files_prefix + "_qlearning.txt.")
 
 
-def test_dealing_with_sparsity():
-    '''
-    When p[s,a,s'] is sparse, one should use
-    compute_optimal_state_values
-    instead of compute_optimal_state_values_nonsparse,
-    and compute_optimal_action_values instead of
-    compute_optimal_action_values_nonsparse
-    '''
-    # continue defining the env
-    nextStateProbability = np.array([[[0.5, 0.5, 0],
-                                      [0.9, 0.1, 0]],
-                                     [[0, 0.5, 0.5],
-                                      [0, 0.2, 0.8]],
-                                     [[0, 0, 1],
-                                      [0, 0, 1]]])
-    rewardsTable = np.array([[[-3, 0, 0],
-                              [-2, 5, 5]],
-                             [[4, 5, 0],
-                              [2, 2, 6]],
-                             [[-8, 2, 80],
-                              [11, 0, 3]]])
-
-    env = KnownDynamicsEnv(nextStateProbability, rewardsTable)
-
-    use_nonsparse_version = True
-    state_values, iteration = compute_optimal_state_values(
-        env, use_nonsparse_version=use_nonsparse_version)
-    print("state_values=", state_values, 'using ', iteration, 'iterations')
-    use_nonsparse_version = False
-    state_values2, iteration = compute_optimal_state_values(
-        env, use_nonsparse_version=use_nonsparse_version)
-    print("state_values with sparsity=", state_values2,
-          'using ', iteration, 'iterations')
-    assert np.array_equal(state_values, state_values2)
-
-    action_values, stopping_criteria = compute_optimal_action_values_nonsparse(
-        env)
-    iteration = stopping_criteria.shape[0]
-    stopping_criterion = stopping_criteria[-1]
-    print("action_values=", action_values, 'using ', iteration, 'iterations')
-    print('Stopping criteria until convergence =', stopping_criteria)
-
-    action_values2, stopping_criteria = compute_optimal_action_values(
-        env)
-    iteration = stopping_criteria.shape[0]
-    stopping_criterion = stopping_criteria[-1]
-    print("action_values with sparsity=", action_values2, "converged with",
-          iteration, "iterations with stopping criterion=", stopping_criterion)
-    assert np.array_equal(action_values, action_values2)
 
 
 if __name__ == '__main__':

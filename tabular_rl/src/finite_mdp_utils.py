@@ -23,7 +23,8 @@ import numpy as np
 import gymnasium as gym
 from random import choices
 from gymnasium import spaces
-from tabular_rl.src.known_dynamics_env import KnownDynamicsEnv
+from tabular_rl.src.knowm_dynamics_env import KnownDynamicsEnv, listKdEnv
+from scipy.optimize import fsolve
 
 def check_if_fmdp(environment: gym.Env):
     # checks if env is a FMDP gym with discrete spaces
@@ -134,7 +135,7 @@ def run_episode(env: gym.Env, policy: np.ndarray, maxNumIterations=100, printInf
     methods such as @choose_epsilon_greedy_action)
     '''
     env.reset()
-    s = env.get_state()
+    s = env.get_obs()
     totalReward = 0
     list_of_actions = np.arange(env.A)
     if printInfo:
@@ -150,11 +151,11 @@ def run_episode(env: gym.Env, policy: np.ndarray, maxNumIterations=100, printInf
         ob, reward, gameOver,truncade, history = env.step(action)
 
         # assume the user may want to apply some postprocessing step, similar to a callback function
-        env.postprocessing_MDP_step(history, printPostProcessingInfo)
+        #env.postprocessing_MDP_step(history, printPostProcessingInfo)
         if printInfo:
             print(history)
         totalReward += reward
-        s = env.get_state()  # update current state
+        s = env.get_obs()  # update current state
         if gameOver == True:
             break
     if printInfo:
@@ -167,53 +168,14 @@ def get_unrestricted_possible_actions_per_state(env: gym.Env) -> list:
     Create a list of lists, that indicates for each state, the list of allowed actions.
     Here we indicate all actions are valid for each state.
     '''
-    S, A = get_space_dimensions_for_openai_gym(env)
+    S = env.S
+    A = env.A
     possible_actions_per_state = list()
     for s in range(S):
         possible_actions_per_state.append(list())
         for a in range(A):
             possible_actions_per_state[s].append(a)
     return possible_actions_per_state
-
-
-def q_learning_episode(env: gym.Env,
-                       stateActionValues: np.ndarray,
-                       possible_actions_per_state: list,
-                       max_num_time_steps=100, stepSizeAlpha=0.1,
-                       explorationProbEpsilon=0.01, discountGamma=0.9) -> int:
-    '''    
-    An episode with Q-Learning. We reset the environment.
-    Note stateActionValues is not reset within this method, and can be already initialized.
-    One needs to pay attention to allowing only
-    valid actions. The simple algorithms provided in Sutton's book do not
-    take that in account. See the discussion:
-    https://ai.stackexchange.com/questions/31819/how-to-handle-invalid-actions-for-next-state-in-q-learning-loss
-    Here we use possible_actions_per_state to indicate the valid actions.
-    This list is a member variable of KnownDynamicsEnv enviroments but must be generated
-    for other enviroments with the method @get_unrestricted_possible_actions_per_state
-    or a similar one, which takes in account eventual restrictions.
-    @return: average reward within this episode
-    '''
-    env.reset()
-    currentState = env.get_state()
-    rewards = 0.0
-    for numIterations in range(max_num_time_steps):
-        currentAction = action_via_epsilon_greedy(currentState, stateActionValues,
-                                                  possible_actions_per_state,
-                                                  explorationProbEpsilon=explorationProbEpsilon,
-                                                  run_faster=False)
-
-        newState, reward, gameOver, truncade, history = env.step(currentAction)
-        rewards += reward
-        # Q-Learning update
-        stateActionValues[currentState, currentAction] += stepSizeAlpha * (
-            reward + discountGamma * np.max(stateActionValues[newState, :]) -
-            stateActionValues[currentState, currentAction])
-        currentState = newState
-        if gameOver:
-            break
-    # normalize rewards to facilitate comparison
-    return rewards / (numIterations+1)
 
 
 def action_via_epsilon_greedy(state: int,
@@ -259,62 +221,7 @@ def action_greedy(state: int,
     return max_index
 
 
-def q_learning_several_episodes(env: gym.Env,
-                                episodes_per_run=100,
-                                max_num_time_steps_per_episode=10,
-                                num_runs=1, discountGamma=0.9,
-                                stepSizeAlpha=0.1, explorationProbEpsilon=0.01,
-                                possible_actions_per_state=None, verbosity=1) -> tuple[np.ndarray, np.ndarray]:
-    '''Use independent runs instead of a single run.
-    Increase num_runs if you want smooth numbers representing the average.
-    @return tuple with stateActionValues corresponding to best average rewards among all runs
-    and '''
-    if verbosity > 0:
-        print("Running", num_runs, " runs of q_learning_several_episodes() with",
-              episodes_per_run, "episodes per run")
 
-    if possible_actions_per_state == None:
-        if isinstance(env, KnownDynamicsEnv):
-            possible_actions_per_state = env.possible_actions_per_state
-        else:
-            # assume it is a generic OpenAI gym and all actions are possible for all states
-            # if this is not the case, the user should build possible_actions_per_state himself/herself
-            # and pass to this method
-            possible_actions_per_state = get_unrestricted_possible_actions_per_state(
-                env)
-
-    # shows convergence over episodes
-    rewardsQLearning = np.zeros(episodes_per_run)
-    best_stateActionValues = np.zeros((env.S, env.A))  # store best over runs
-    largest_reward = -np.inf  # initialize with negative value
-    for run in range(num_runs):
-        stateActionValues = np.zeros((env.S, env.A))  # reset for each run
-        sum_rewards_this_run = 0
-        for i in range(episodes_per_run):
-            # update stateActionValues in-place (that is, updates stateActionValues)
-            reward = q_learning_episode(env, stateActionValues,
-                                        possible_actions_per_state,
-                                        max_num_time_steps=max_num_time_steps_per_episode,
-                                        stepSizeAlpha=stepSizeAlpha, discountGamma=discountGamma,
-                                        explorationProbEpsilon=explorationProbEpsilon)
-            rewardsQLearning[i] += reward
-            sum_rewards_this_run += reward
-        average_reward_this_run = sum_rewards_this_run / episodes_per_run
-        if average_reward_this_run > largest_reward:
-            largest_reward = average_reward_this_run
-            best_stateActionValues = stateActionValues.copy()
-            if verbosity > 0:
-                print("Found better stateActionValues")
-        if verbosity > 0:
-            print('run=', run, 'average reward=', average_reward_this_run)
-    # need to normalize to get rewards convergence over episodes
-    rewardsQLearning /= num_runs
-    if verbosity > 1:
-        print('rewardsQLearning = ', rewardsQLearning)
-        print('newStateActionValues = ', stateActionValues)
-        print('qlearning_policy = ',
-              convert_action_values_into_policy(stateActionValues))
-    return best_stateActionValues, rewardsQLearning
 
 
 def create_random_next_state_probability(S: int, A: int) -> np.ndarray:
@@ -342,13 +249,14 @@ def generate_trajectory(env: gym.Env, policy: np.ndarray, num_steps: int) -> tup
     valid actions, so we do not worry about it (we do not need to invoke
     methods such as @choose_epsilon_greedy_action)
     '''
+    env.reset()
     list_of_actions = np.arange(env.A)  # list all existing actions
     # initialize arrays
     taken_actions = np.zeros(num_steps, dtype=int)
     rewards_tp1 = np.zeros(num_steps)
     states = np.zeros(num_steps, dtype=int)
     for t in range(num_steps):
-        states[t] = env.current_observation_or_state  # current state
+        states[t] = env.get_obs()  # current state
         # choose action according to the policy
         taken_actions[t] = choices(
             list_of_actions, weights=policy[states[t]])[0]
@@ -409,7 +317,35 @@ def hyperparameter_grid_search(env: gym.Env):
             # fileName = 'smooth_q_eps' + str(e) + '_alpha' + str(a) + '.txt'
             # sys.stdout = open(fileName, 'w')
 
+def theoretical_value_function(P, R, gama = 0.9):
+    # Função generalizada
+    s = P.shape[0]
+    a = P.shape[1]
+    def fun(k):
+        return np.array([
+            k[i] - max([
+                sum([P[i, j, w] * (R[i, j, w] + gama * k[w]) for w in range(s)])
+                for j in range(a)
+            ])
+            for i in range(s)
+        ])
+    print("made the system")
 
+    # Solução inicial
+    initial_guess = np.ones(s)
+
+    # Opções de otimização (tolerâncias)
+    options = {'xtol': 1e-10, 'ftol': 1e-10}
+    print("solving the system")
+    # Solução
+    sol = fsolve(fun, initial_guess, xtol=options['xtol'])
+    return sol
+
+def  ValueFunctionFromQtable(Q):
+    vF = []
+    for i in range(len(Q)):
+        vF.append(max(Q[i]))
+    return vF
 
 def TODO_estimate_model_probabilities(env: gym.Env):
     '''
@@ -417,6 +353,59 @@ def TODO_estimate_model_probabilities(env: gym.Env):
     Estimate dynamics using Monte Carlo.
     '''
     pass
+
+def compare_qlearning_VI(env, vi_agent, qlearning_agent,
+                                           max_num_time_steps_per_episode=100,
+                                           num_episodes=10,
+                                           explorationProbEpsilon=0.2,
+                                           output_files_prefix=None):
+    # find and use optimum policy
+    
+    action_values = vi_agent.Q_table
+    stopping_criteria = vi_agent.hist
+    iteration = stopping_criteria.shape[0]
+    stopping_criterion = stopping_criteria[-1]
+    print("\nMethod compute_optimal_action_values() converged in",
+          iteration, "iterations with stopping criterion=", stopping_criterion)
+    optimum_policy = vi_agent.get_policy()
+    optimal_rewards = run_several_episodes(env, optimum_policy,
+                                                max_num_time_steps_per_episode=max_num_time_steps_per_episode,
+                                                num_episodes=num_episodes)
+    average_reward = np.mean(optimal_rewards)
+    stddev_reward = np.std(optimal_rewards)
+    print('\nUsing optimum policy, average reward=',
+          average_reward, ' standard deviation=', stddev_reward)
+
+    # learn a policy with Q-learning. Use a single run.
+     
+    stateActionValues = qlearning_agent.Q_table
+    rewardsQLearning = qlearning_agent.hist
+    print('stateActionValues:', stateActionValues)
+    print('rewardsQLearning:', rewardsQLearning)
+
+    # print('Using Q-learning, total reward over training=',np.sum(rewardsQLearning))
+    qlearning_policy = convert_action_values_into_policy(
+        stateActionValues)
+    qlearning_rewards = run_several_episodes(env, qlearning_policy,
+                                                  max_num_time_steps_per_episode=max_num_time_steps_per_episode,
+                                                  num_episodes=num_episodes)
+    average_reward = np.mean(qlearning_rewards)
+    stddev_reward = np.std(qlearning_rewards)
+    print('\nUsing Q-learning policy, average reward=',
+          average_reward, ' standard deviation=', stddev_reward)
+
+    print('Check the Q-learning policy:')
+    env.pretty_print_policy(qlearning_policy)
+
+    if not output_files_prefix == None:
+        with open(output_files_prefix + '_optimal.txt', 'w') as f:
+            f.write(str(optimal_rewards) + "\n")
+
+        with open(output_files_prefix + '_qlearning.txt', 'w') as f:
+            f.write(str(qlearning_rewards) + "\n")
+
+        print("Wrote files", output_files_prefix + "_optimal.txt",
+              "and", output_files_prefix + "_qlearning.txt.")
 
 
 if __name__ == '__main__':

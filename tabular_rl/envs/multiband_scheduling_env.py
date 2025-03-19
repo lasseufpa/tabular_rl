@@ -8,27 +8,25 @@ It assumes knowledge of the correct nextStateProbability such that it allows to 
 import numpy as np
 import itertools
 import sys
-
-from tabular_rl.src.verbose_kd_env import VerboseKnownDynamicsEnv
+from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
 from tabular_rl import finite_mdp_utils as fmdp
 import tabular_rl.src.optimum_values as optimum
-
+from tabular_rl.src.class_vi import VI_agent as VI
 
 class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
 
     # def __init__(self, discount=1.0):
     def __init__(self):
         self.__version__ = "0.1.0"
-        nextStateProbability, rewardsTable, actionDictionaryGetIndex, actionListGivenIndex, stateDictionaryGetIndex, stateListGivenIndex = self.createEnvironment()
-
+        nextStateProbability, rewardsTable, actionDictionaryGetIndex, actionListGivenIndex, actcomp, stateDictionaryGetIndex, stateListGivenIndex, statecomp = self.createEnvironment()
+        print(nextStateProbability.shape)
         # pack data structures (dic and list) to map names into indices for actions
-        actions_info = [actionDictionaryGetIndex, actionListGivenIndex]
-
+        actions_info = [actionDictionaryGetIndex, actionListGivenIndex, actcomp]
+        
         # pack data structures (dic and list) to map names into indices for states
-        states_info = [stateDictionaryGetIndex, stateListGivenIndex]
-
+        states_info = [stateDictionaryGetIndex, stateListGivenIndex, statecomp]
         # call superclass constructor
-        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable,
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=0.9,
                                          actions_info=actions_info, states_info=states_info)
 
     def prettyPrint(self):
@@ -156,7 +154,8 @@ class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
                         actionDictionaryGetIndex[actionTuple] = uniqueIndex
                         actionListGivenIndex.append(actionTuple)
                         uniqueIndex += 1
-        return actionDictionaryGetIndex, actionListGivenIndex
+        names = ["user0", "user1", "freq0", "freq1"]
+        return actionDictionaryGetIndex, actionListGivenIndex, names
 
     def createStatesDataStructures(self, M, B):
         '''
@@ -184,8 +183,8 @@ class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
             stateListGivenIndex.append(augumentedTuple)
             stateDictionaryGetIndex[augumentedTuple] = uniqueIndex
             uniqueIndex += 1
-
-        return stateDictionaryGetIndex, stateListGivenIndex
+        names = ["buffers", "interference"]
+        return stateDictionaryGetIndex, stateListGivenIndex, names
 
     def createRewardsDataStructures(self, possibleRewards):
         '''
@@ -256,7 +255,7 @@ class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
         self.F = F = 2  # number of frequencies
 
         # initialize variables and data structures
-        actionDictionaryGetIndex, actionListGivenIndex = self.createActionsDataStructures(
+        actionDictionaryGetIndex, actionListGivenIndex, actcomp = self.createActionsDataStructures(
             M, F)
         A = len(actionListGivenIndex)
 
@@ -264,7 +263,7 @@ class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
         self.bitRates = np.zeros((self.M,))
         self.packetDropCounts = np.zeros((self.M,))
 
-        stateDictionaryGetIndex, stateListGivenIndex = self.createStatesDataStructures(
+        stateDictionaryGetIndex, stateListGivenIndex, statecomp = self.createStatesDataStructures(
             M, B)
         S = len(stateListGivenIndex)
 
@@ -383,7 +382,7 @@ class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
                     # just to check if dictionary is complete
                     rewardIndice = rewardDictionaryGetIndex[r]
 
-        return nextStateProbability, rewardsTable, actionDictionaryGetIndex, actionListGivenIndex, stateDictionaryGetIndex, stateListGivenIndex
+        return nextStateProbability, rewardsTable, actionDictionaryGetIndex, actionListGivenIndex,actcomp, stateDictionaryGetIndex, stateListGivenIndex, statecomp
 
     def postprocessing_MDP_step(self, history, printPostProcessingInfo):
         '''This method overrides its superclass equivalent and
@@ -445,6 +444,7 @@ def evaluateLearning():
 
 
 if __name__ == '__main__':
+
     env = MultibandToyExampleEnv()
     env.prettyPrint()
 
@@ -455,8 +455,9 @@ if __name__ == '__main__':
     # fmdp.hyperparameter_grid_search(env)
 
     # Get optimum action values
-    action_values, stopping_criteria = optimum.compute_optimal_action_values(
-        env, tolerance=0)
+    vi_agent = VI(env, tolerance=0)
+    action_values = vi_agent.Q_table
+    stopping_criteria = vi_agent.hist
     iteration = stopping_criteria.shape[0]  # number of iterations
     stopping_criterion = stopping_criteria[-1]  # final stopping criterion
     print("All values of stopping criteria along the iterations: ", stopping_criteria)
