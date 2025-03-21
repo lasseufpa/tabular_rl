@@ -9,6 +9,28 @@ with that, in a .py, you can call the module with
 ```
 import tabular_rl 
 ```
+# Quick Start
+
+Simple use of the module
+
+``` 
+from tabular_rl import finite_mdp_utils as fmdp
+from tabular_rl import vi_agent as VI
+from tabular_rl import  simple_known_dynamics
+
+# Generate a simple environment
+env = simple_known_dynamics.SimpleKnownDynamicsEnv()
+gamma =  0.9
+tolerance = 0.0001
+debug =  False
+
+# Run the VI algorithm and get the policy
+Vi_agent = VI.VI_agent(env, gamma, tolerance, debug)
+vi_policy = Vi_agent.get_policy()
+
+# Generate some episodes with VI policy in that env
+sum_rewards_episode = fmdp.run_several_episodes(env, Vi_agent.get_policy())
+```
 
 # Composition
 This module is splited in two main parts, environments (envs) and codes for agent and experiments (source, src).
