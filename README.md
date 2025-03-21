@@ -1,18 +1,48 @@
 # tabular_rl
-Code for finite Markov decision processes (FMDP) or tabular reinforcement learning with known dynamics. The fact that we fully known the dynamics of the FMDP, allows us to estimate optimum policies.
-
+Tabular RL is a Python library designed for finite Markov decision processes (MDPs) and tabular reinforcement learning with known dynamics. It provides efficient algorithms and utilities for solving MDPs, estimating optimal policies, and experimenting with various RL environments.
 
 # Installation
+To install the repository, first clone it and in a folder, then use:
+``pip install -e tabular_rl/``
 
-You can use
-``python setup.py install``
+with that, in a .py, you can call the module with
+```
+import tabular_rl 
+```
 
-or directly set PYTHONPATH. For instance, on Windows
+# Composition
+This module is splited in two main parts, environments (envs) and codes for agent and experiments (source, src).
 
-``set PYTHONPATH=C:\github\tabular_rl\src``
+The src is composed by:
+- **known dynamics env**  
+  It contains the main classes to represent MDPs with known dynamics as a gym environment.
+  - **class Known dynamic env**
+    
+    It contains the information of current state, number of steps and manage the type of struct used to store the env dynamics and compose the step and reset methods.
+    
+  - **Verbose Known dynamic env**
 
-or Linux, using bash
+    It put a layer of informations above the class Known dynamic env, used to integrate with deep RL library as Stable Baseline 3. It requires, besides the env dynamics, structures contained informations about state and actions
+    
+  - **simple struct (for now is listKdEnv)**
 
-``export PYTHONPATH=/home/user/github/tabular_rl/src``
+    class to run the enviroment on simplified structures, like lists. It works better with environments with low dynamics sparsity
+    
+  - **Optimized struct (for now is dictKdEnv)**
 
-If you use VS Code and it is not finding the Python code, it may be useful to read https://stackoverflow.com/questions/53653083/how-to-correctly-set-pythonpath-for-visual-studio-code
+     class to run the enviroment on optimized structures based on dictionarys.
+
+- **VI agent**  
+  Class to manage how it will run the Value Iteration algorithm based on the type of strucutre chosed by known dynamics env
+
+- **Qlearning agent**  
+  Run a simple Q learning agent
+
+- **FMDP Utils**  
+  Some RL utilites like make a trajectory based on a environment and a policy, calculate theoretical values of Action Value Fuctions (just work for list dynamics), convert AVF into policy...  
+
+- **Mobile Utils**  
+  Some utilites to create the envs multiband_scheduling and user_schedulling
+
+- **Optimum Values**  
+  I hope my boss allows me to remove it.
