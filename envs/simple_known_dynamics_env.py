@@ -1,6 +1,6 @@
 import numpy as np
-from tabular_rl.src.knowm_dynamics_env import KnownDynamicsEnv
-from tabular_rl import finite_mdp_utils as fmdp
+from src.knowm_dynamics_env import KnownDynamicsEnv
+from src import finite_mdp_utils as fmdp
 
 
 class SimpleKnownDynamicsEnv(KnownDynamicsEnv):

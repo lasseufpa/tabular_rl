@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import fsolve
-from tabular_rl.src.knowm_dynamics_env import KnownDynamicsEnv
-from tabular_rl import finite_mdp_utils as fmdp
+from src.knowm_dynamics_env import KnownDynamicsEnv
+from src import finite_mdp_utils as fmdp
 
 
 def compute_optimal_state_values(env: KnownDynamicsEnv, discountGamma=0.9, tolerance=1e-20, use_sutton_version=True, use_nonsparse_version=False) -> tuple[np.ndarray, int]:

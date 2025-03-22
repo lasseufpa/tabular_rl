@@ -1,8 +1,8 @@
 import numpy as np
 import pickle
 from typing import Tuple, List
-from tabular_rl.src.finite_mdp_utils import ValueFunctionFromQtable as qt2vf
-from tabular_rl.src.finite_mdp_utils import convert_action_values_into_policy as getPol
+from src.finite_mdp_utils import ValueFunctionFromQtable as qt2vf
+from src.finite_mdp_utils import convert_action_values_into_policy as getPol
 
 
 class VI_agent():

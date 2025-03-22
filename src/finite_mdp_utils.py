@@ -23,7 +23,7 @@ import numpy as np
 import gymnasium as gym
 from random import choices
 from gymnasium import spaces
-from tabular_rl.src.knowm_dynamics_env import KnownDynamicsEnv, listKdEnv
+from src.knowm_dynamics_env import KnownDynamicsEnv, listKdEnv
 from scipy.optimize import fsolve
 
 def check_if_fmdp(environment: gym.Env):

@@ -38,13 +38,13 @@ import numpy as np
 import itertools
 import pickle
 import os
-import tabular_rl.src.optimum_values as optimum
+import src.optimum_values as optimum
 
-from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
-from tabular_rl import finite_mdp_utils as fmdp
-from tabular_rl.src.mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
-from tabular_rl.src.class_vi import VI_agent as VI
-from tabular_rl.src.class_qlearning import Qlearning_agent as QL
+from src.knowm_dynamics_env import VerboseKnownDynamicsEnv
+from src import finite_mdp_utils as fmdp
+from src.mobility_utils import all_valid_next_moves, combined_users_positions, one_step_moves_in_grid
+from src.class_vi import VI_agent as VI
+from src.class_qlearning import Qlearning_agent as QL
 
 class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 

@@ -22,11 +22,11 @@ Modified by Aldebaro. 2023
 from __future__ import print_function
 import numpy as np
 import itertools
-import tabular_rl.src.optimum_values as optimum
-from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
-from tabular_rl import finite_mdp_utils as fmdp
-from tabular_rl.src.class_vi import VI_agent as VI
-from tabular_rl.src.class_qlearning import Qlearning_agent as QL
+import src.optimum_values as optimum
+from src.knowm_dynamics_env import VerboseKnownDynamicsEnv
+from src import finite_mdp_utils as fmdp
+from src.class_vi import VI_agent as VI
+from src.class_qlearning import Qlearning_agent as QL
 
 
 class SuttonGridWorldEnv(VerboseKnownDynamicsEnv):

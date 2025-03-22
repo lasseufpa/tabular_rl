@@ -8,10 +8,10 @@ It assumes knowledge of the correct nextStateProbability such that it allows to 
 import numpy as np
 import itertools
 import sys
-from tabular_rl.src.knowm_dynamics_env import VerboseKnownDynamicsEnv
-from tabular_rl import finite_mdp_utils as fmdp
-import tabular_rl.src.optimum_values as optimum
-from tabular_rl.src.class_vi import VI_agent as VI
+from src.knowm_dynamics_env import VerboseKnownDynamicsEnv
+from src import finite_mdp_utils as fmdp
+import src.optimum_values as optimum
+from src.class_vi import VI_agent as VI
 
 class MultibandToyExampleEnv(VerboseKnownDynamicsEnv):
 
