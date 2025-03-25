@@ -25,6 +25,7 @@ from random import choices
 from gymnasium import spaces
 from src.knowm_dynamics_env import KnownDynamicsEnv, listKdEnv
 from scipy.optimize import fsolve
+import scipy as sc
 
 def check_if_fmdp(environment: gym.Env):
     # checks if env is a FMDP gym with discrete spaces
@@ -406,6 +407,34 @@ def compare_qlearning_VI(env, vi_agent, qlearning_agent,
 
         print("Wrote files", output_files_prefix + "_optimal.txt",
               "and", output_files_prefix + "_qlearning.txt.")
+
+def matrix2dict(nextStateProbability, rewardTable):
+
+    S = nextStateProbability.shape[0]
+    A = nextStateProbability.shape[1]
+
+
+    nextStateProbability = nextStateProbability.reshape([A*S, S])
+    nextStateProbability = sc.csr_matrix(nextStateProbability).todok()
+
+    rewardTable = rewardTable.reshape([A*S, S])
+    rewardTable =  sc.dok_matrix(rewardTable)
+
+    auxDict = {}
+    for i in nextStateProbability.keys():
+        auxDict[i] = (nextStateProbability[i],rewardTable[i])
+
+    return auxDict
+
+def dict2matrix(dynamics, NS, NA):
+    p = np.zeros([NS, NA, NS])
+    r = np.zeros([NS, NA, NS])
+    for i in dynamics.items():
+        state, act = divmod(i[0][0], NA)
+        p[state][act][i[0][1]] = i[1][0]
+        r[state][act][i[0][1]] = i[1][1]
+        
+    return p, r
 
 
 if __name__ == '__main__':
