@@ -51,7 +51,8 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
     def __init__(self, G=6, B=3, Nu=2, num_pkts_per_tti=2,
                  can_users_share_position=False,
                  should_add_not_moving=False,
-                 print_debug_info=False):
+                 print_debug_info=False,
+                 mobility_pattern='uniform'):
         self.G = G  # grid dimension
         self.B = B  # buffer size
         self.Nu = Nu  # number of users
@@ -59,6 +60,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.can_users_share_position = can_users_share_position
         self.should_add_not_moving = should_add_not_moving
         self.print_debug_info = print_debug_info
+        self.mobility_pattern = mobility_pattern
 
         self.actions_move = one_step_moves_in_grid(
             should_add_not_moving=should_add_not_moving)
@@ -66,7 +68,6 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.indexGivenActionDictionary, self.actionGivenIndexList, actcomp = createActionsDataStructures(
             self.Nu)
         self.A = len(self.actionGivenIndexList)
-        
         self.indexGivenStateDictionary, self.stateGivenIndexList, statecomp = createStatesDataStructures(
             self.actions_move, G=self.G, Nu=self.Nu, B=self.B, can_users_share_position=can_users_share_position,
             show_debug_info=self.print_debug_info)
@@ -100,7 +101,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                        statecomp]
 
         # call superclass constructor
-        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=1,
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=0.5,
                                          actions_info=actions_info, states_info=states_info)
         if self.print_debug_info:
             print("INFO: finished creating environment")
@@ -215,9 +216,37 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                 valid_next_positions = all_valid_next_positions[all_positions]
                 # define a probability value to each new position
                 num_valid_next_positions = len(valid_next_positions)
-                # impose uniform probability
-                prob = 1.0 / num_valid_next_positions
+
+                if self.mobility_pattern == 'horiz_first':
+                    only_horiz_moves, horiz_vert_move, only_vertical = 0,0,0
+                    next_pos_type_weight = []
+                    pos_type_count = 0
+                    for next_pos in valid_next_positions:
+                        # Only horizontal moves
+                        if all_positions[0][1] != next_pos[0][1] and all_positions[1][1] != next_pos[1][1]:
+                            only_horiz_moves += 1
+                            next_pos_type_weight.append(3)
+                        # Only vertical moves
+                        elif all_positions[0][0] != next_pos[0][0] and all_positions[1][0] != next_pos[1][0]:
+                            only_vertical += 1
+                            next_pos_type_weight.append(1)
+                        # Horizontal and vertical moves
+                        else:
+                            horiz_vert_move += 1
+                            next_pos_type_weight.append(2)
+
                 for next_pos in valid_next_positions:
+                    # defining mobility pattern
+                    if self.mobility_pattern == "uniform":
+                        prob = 1.0 / num_valid_next_positions
+                    elif self.mobility_pattern == "horiz_first":
+                        prob = next_pos_type_weight[pos_type_count] / np.sum(
+                            next_pos_type_weight
+                        )
+                        pos_type_count += 1
+                    else:
+                        raise Exception("mobility pattern not implemented")
+                    
                     # compose the state
                     new_state = (next_pos, new_buffer_occupancy_tuple)
                     nextStateIndice = self.indexGivenStateDictionary[new_state]
