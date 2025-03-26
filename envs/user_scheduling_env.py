@@ -48,17 +48,28 @@ from src.class_qlearning import Qlearning_agent as QL
 
 class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
-    def __init__(self, G=6, B=3, Nu=2, num_pkts_per_tti=2,
-                 can_users_share_position=False,
-                 should_add_not_moving=False,
-                 print_debug_info=False):
+    def __init__(
+        self,
+        G=6,
+        B=3,
+        Nu=2,
+        num_pkts_per_tti=2,
+        can_users_share_position=False,
+        should_add_not_moving=False,
+        print_debug_info=False,
+        mobility_pattern="uniform",
+        traffic_pattern="constant_bit_rate",
+    ):
         self.G = G  # grid dimension
         self.B = B  # buffer size
         self.Nu = Nu  # number of users
-        self.num_incoming_packets_per_time_slot = num_pkts_per_tti
+        self.constant_num_pkts_per_tti = num_pkts_per_tti
         self.can_users_share_position = can_users_share_position
         self.should_add_not_moving = should_add_not_moving
         self.print_debug_info = print_debug_info
+        self.mobility_pattern = mobility_pattern
+        self.traffic_pattern = traffic_pattern
+        self.bs_position = [(0,0)]
 
         self.actions_move = one_step_moves_in_grid(
             should_add_not_moving=should_add_not_moving)
@@ -66,22 +77,16 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.indexGivenActionDictionary, self.actionGivenIndexList, actcomp = createActionsDataStructures(
             self.Nu)
         self.A = len(self.actionGivenIndexList)
-        
         self.indexGivenStateDictionary, self.stateGivenIndexList, statecomp = createStatesDataStructures(
             self.actions_move, G=self.G, Nu=self.Nu, B=self.B, can_users_share_position=can_users_share_position,
-            show_debug_info=self.print_debug_info)
+            show_debug_info=self.print_debug_info, disabled_positions=self.bs_position)
 
         print(self.indexGivenStateDictionary)
         self.S = len(self.stateGivenIndexList)
 
         # self.ues_pos_prob, self.channel_spectral_efficiencies, self.ues_valid_actions = self.read_external_files()
 
-        if True:
-            # the same value for all
-            self.channel_spectral_efficiencies = (
-                self.num_incoming_packets_per_time_slot+1)*np.ones((G, G))
-        else:
-            self.channel_spectral_efficiencies = get_channel_spectral_efficiency()
+        self.channel_spectral_efficiencies = get_channel_spectral_efficiency()
 
         if self.print_debug_info:
             print("self.channel_spectral_efficiencies",
@@ -100,7 +105,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                        statecomp]
 
         # call superclass constructor
-        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=1,
+        VerboseKnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, sparcity_treshold=0.5,
                                          actions_info=actions_info, states_info=states_info)
         if self.print_debug_info:
             print("INFO: finished creating environment")
@@ -153,10 +158,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         nextStateProbability = np.zeros((self.S, self.A, self.S))
         rewardsTable = np.zeros((self.S, self.A, self.S))
         # to define the mobility pattern, find all next positions
-        disabled_positions = list()
-        # disable the base station position: users cannot ocuppy it
-        disabled_positions.append(np.array([self.G-1, 0]))
-        all_valid_next_positions = all_valid_next_moves(self.G, disabled_positions,
+        all_valid_next_positions = all_valid_next_moves(self.G, self.bs_position,
                                                         should_add_not_moving=self.should_add_not_moving,
                                                         number_of_users=self.Nu,
                                                         can_users_share_position=self.can_users_share_position)
@@ -180,6 +182,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
                 # Update buffer according to action and packet transmission
                 new_buffer = np.array(new_buffer_occupancy_tuple)
+
                 # decrement buffer of chosen user
                 new_buffer[chosen_user] -= num_packets_supported_by_channel
 
@@ -191,8 +194,18 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                 else:
                     num_transmitted_packets = num_packets_supported_by_channel
 
+                # traffic pattern
+                if self.traffic_pattern == "full_buffer":
+                    traffic = self.B - new_buffer[chosen_user]
+                elif self.traffic_pattern == "constant_bit_rate":
+                    traffic = self.constant_num_pkts_per_tti
+                elif self.traffic_pattern == "random":
+                    traffic = np.random.randint(1, self.B)
+                else:
+                    raise Exception("Traffic pattern not implemented")
+
                 # Update buffer based on arrival of new packets
-                new_buffer += self.num_incoming_packets_per_time_slot  # arrival of new packets
+                new_buffer += traffic  # arrival of new packets
 
                 # check if buffer overflow occurred
                 # in case positive, limit the buffers to maximum capacity
@@ -215,9 +228,37 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                 valid_next_positions = all_valid_next_positions[all_positions]
                 # define a probability value to each new position
                 num_valid_next_positions = len(valid_next_positions)
-                # impose uniform probability
-                prob = 1.0 / num_valid_next_positions
+
+                if self.mobility_pattern == 'horiz_first':
+                    only_horiz_moves, horiz_vert_move, only_vertical = 0,0,0
+                    next_pos_type_weight = []
+                    pos_type_count = 0
+                    for next_pos in valid_next_positions:
+                        # Only horizontal moves
+                        if all_positions[0][1] != next_pos[0][1] and all_positions[1][1] != next_pos[1][1]:
+                            only_horiz_moves += 1
+                            next_pos_type_weight.append(3)
+                        # Only vertical moves
+                        elif all_positions[0][0] != next_pos[0][0] and all_positions[1][0] != next_pos[1][0]:
+                            only_vertical += 1
+                            next_pos_type_weight.append(1)
+                        # Horizontal and vertical moves
+                        else:
+                            horiz_vert_move += 1
+                            next_pos_type_weight.append(2)
+
                 for next_pos in valid_next_positions:
+                    # defining mobility pattern
+                    if self.mobility_pattern == "uniform":
+                        prob = 1.0 / num_valid_next_positions
+                    elif self.mobility_pattern == "horiz_first":
+                        prob = next_pos_type_weight[pos_type_count] / np.sum(
+                            next_pos_type_weight
+                        )
+                        pos_type_count += 1
+                    else:
+                        raise Exception("mobility pattern not implemented")
+
                     # compose the state
                     new_state = (next_pos, new_buffer_occupancy_tuple)
                     nextStateIndice = self.indexGivenStateDictionary[new_state]
@@ -299,24 +340,26 @@ def init_rewards():
     pass
 
 
-def get_channel_spectral_efficiency(G=6, ceil_value=5) -> np.ndarray:
+def get_channel_spectral_efficiency(G=6, ceil_value=None) -> np.ndarray:
     '''
     Create spectral efficiency as 0, 0, ..., 0, 1, 2, 3
     '''
+    if ceil_value is None:
+        ceil_value = np.floor(G/2) -1
     if ceil_value > G*G-1:
         raise Exception(
             "Decrease ceil_value otherwise spectral efficiencies are all zero")
     channel_spectral_efficiencies = np.zeros((G, G))
     for i in range(G):
         for j in range(G):
-            if i+j > ceil_value:
-                channel_spectral_efficiencies[i, j] = 0
+            if np.min([i,j]) < ceil_value and (i+j) < G:
+                channel_spectral_efficiencies[i, j] = G - i -j
             else:
-                channel_spectral_efficiencies[i, j] = i+j
+                channel_spectral_efficiencies[i, j] = 1
     return channel_spectral_efficiencies
 
 
-def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_share_position=False, show_debug_info=True) -> tuple[dict, list]:
+def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_share_position=False, show_debug_info=True, disabled_positions=[]) -> tuple[dict, list]:
     # G is the axis dimension, on both horizontal and vertical
     # I cannot use below:
     # all_positions_list = list(itertools.product(np.arange(G), repeat=2))
@@ -330,10 +373,6 @@ def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_sha
         else:
             num_states *= (G**2-1)**Nu
         print("theoretical number of states =", num_states)
-
-    bs_position = (G-1, 0)  # Base station position
-    disabled_positions = list()
-    disabled_positions.append(bs_position)
 
     all_positions_list = combined_users_positions(G,
                                                   disabled_positions,
