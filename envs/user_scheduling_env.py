@@ -69,6 +69,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.print_debug_info = print_debug_info
         self.mobility_pattern = mobility_pattern
         self.traffic_pattern = traffic_pattern
+        self.bs_position = [(0,0)]
 
         self.actions_move = one_step_moves_in_grid(
             should_add_not_moving=should_add_not_moving)
@@ -78,18 +79,14 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.A = len(self.actionGivenIndexList)
         self.indexGivenStateDictionary, self.stateGivenIndexList, statecomp = createStatesDataStructures(
             self.actions_move, G=self.G, Nu=self.Nu, B=self.B, can_users_share_position=can_users_share_position,
-            show_debug_info=self.print_debug_info)
+            show_debug_info=self.print_debug_info, disabled_positions=self.bs_position)
 
         print(self.indexGivenStateDictionary)
         self.S = len(self.stateGivenIndexList)
 
         # self.ues_pos_prob, self.channel_spectral_efficiencies, self.ues_valid_actions = self.read_external_files()
 
-        if True:
-            # the same value for all
-            self.channel_spectral_efficiencies = (self.constant_num_pkts_per_tti+1)*np.ones((G, G))
-        else:
-            self.channel_spectral_efficiencies = get_channel_spectral_efficiency()
+        self.channel_spectral_efficiencies = get_channel_spectral_efficiency()
 
         if self.print_debug_info:
             print("self.channel_spectral_efficiencies",
@@ -161,10 +158,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         nextStateProbability = np.zeros((self.S, self.A, self.S))
         rewardsTable = np.zeros((self.S, self.A, self.S))
         # to define the mobility pattern, find all next positions
-        disabled_positions = list()
-        # disable the base station position: users cannot ocuppy it
-        disabled_positions.append(np.array([self.G-1, 0]))
-        all_valid_next_positions = all_valid_next_moves(self.G, disabled_positions,
+        all_valid_next_positions = all_valid_next_moves(self.G, self.bs_position,
                                                         should_add_not_moving=self.should_add_not_moving,
                                                         number_of_users=self.Nu,
                                                         can_users_share_position=self.can_users_share_position)
@@ -346,24 +340,26 @@ def init_rewards():
     pass
 
 
-def get_channel_spectral_efficiency(G=6, ceil_value=5) -> np.ndarray:
+def get_channel_spectral_efficiency(G=6, ceil_value=None) -> np.ndarray:
     '''
     Create spectral efficiency as 0, 0, ..., 0, 1, 2, 3
     '''
+    if ceil_value is None:
+        ceil_value = np.floor(G/2) -1
     if ceil_value > G*G-1:
         raise Exception(
             "Decrease ceil_value otherwise spectral efficiencies are all zero")
     channel_spectral_efficiencies = np.zeros((G, G))
     for i in range(G):
         for j in range(G):
-            if i+j > ceil_value:
-                channel_spectral_efficiencies[i, j] = 0
+            if np.min([i,j]) < ceil_value and (i+j) < G:
+                channel_spectral_efficiencies[i, j] = G - i -j
             else:
-                channel_spectral_efficiencies[i, j] = i+j
+                channel_spectral_efficiencies[i, j] = 1
     return channel_spectral_efficiencies
 
 
-def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_share_position=False, show_debug_info=True) -> tuple[dict, list]:
+def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_share_position=False, show_debug_info=True, disabled_positions=[]) -> tuple[dict, list]:
     # G is the axis dimension, on both horizontal and vertical
     # I cannot use below:
     # all_positions_list = list(itertools.product(np.arange(G), repeat=2))
@@ -377,10 +373,6 @@ def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_sha
         else:
             num_states *= (G**2-1)**Nu
         print("theoretical number of states =", num_states)
-
-    bs_position = (G-1, 0)  # Base station position
-    disabled_positions = list()
-    disabled_positions.append(bs_position)
 
     all_positions_list = combined_users_positions(G,
                                                   disabled_positions,
