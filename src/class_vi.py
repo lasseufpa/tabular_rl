@@ -47,8 +47,10 @@ def valueIteration_dictEnv(env,
     iteration = 1
 
     if isinstance(env.nextStateProbability, str):
-        dynamic_files_inf = env.indentify_text["file_inf"]
+        dynamic_files_inf = env.get_identify_inf()["file_inf"]
+        
         transition_func = lambda: _load_dynamic_files(env.nextStateProbability, dynamic_files_inf)
+    
     else:
         transition_func = lambda: iter(env.nextStateProbability.items())
 
@@ -56,7 +58,7 @@ def valueIteration_dictEnv(env,
         if debug:  # debug
             print('new state values=', new_action_values)
             print('it=', iteration, 'improvement = ', maxdif)
-
+        
         maxdif = _iterate_value_function(
             transition_func,
             new_action_values,
@@ -66,6 +68,7 @@ def valueIteration_dictEnv(env,
         )
         
         iteration += 1
+        print(iteration)
 
 
 
@@ -100,6 +103,7 @@ def _iterate_value_function(transition_func, action_values, discountGamma, A, st
     prev_state, prev_action = 0, 0
 
     for (state_action, (prob, reward)) in transition_func():
+        
         state, action = divmod(state_action[0], A)
         best_next_action = max(action_values[state_action[1]])  # Best Q-value for the next state
 

@@ -74,6 +74,11 @@ class KnownDynamicsEnv(gym.Env):
             return None
         else:
             return self.struct.valid_next_states
+        
+    def get_identify_inf(self):
+
+        return self.struct.indentify_text
+
 
 class VerboseKnownDynamicsEnv(KnownDynamicsEnv):
     def __init__(self, nextStateProbability, rewardsTable= None, NS = None, NA = None, sparcity_treshold = 0.5,
