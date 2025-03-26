@@ -48,19 +48,27 @@ from src.class_qlearning import Qlearning_agent as QL
 
 class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
-    def __init__(self, G=6, B=3, Nu=2, num_pkts_per_tti=2,
-                 can_users_share_position=False,
-                 should_add_not_moving=False,
-                 print_debug_info=False,
-                 mobility_pattern='uniform'):
+    def __init__(
+        self,
+        G=6,
+        B=3,
+        Nu=2,
+        num_pkts_per_tti=2,
+        can_users_share_position=False,
+        should_add_not_moving=False,
+        print_debug_info=False,
+        mobility_pattern="uniform",
+        traffic_pattern="constant_bit_rate",
+    ):
         self.G = G  # grid dimension
         self.B = B  # buffer size
         self.Nu = Nu  # number of users
-        self.num_incoming_packets_per_time_slot = num_pkts_per_tti
+        self.constant_num_pkts_per_tti = num_pkts_per_tti
         self.can_users_share_position = can_users_share_position
         self.should_add_not_moving = should_add_not_moving
         self.print_debug_info = print_debug_info
         self.mobility_pattern = mobility_pattern
+        self.traffic_pattern = traffic_pattern
 
         self.actions_move = one_step_moves_in_grid(
             should_add_not_moving=should_add_not_moving)
@@ -79,8 +87,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
         if True:
             # the same value for all
-            self.channel_spectral_efficiencies = (
-                self.num_incoming_packets_per_time_slot+1)*np.ones((G, G))
+            self.channel_spectral_efficiencies = (self.constant_num_pkts_per_tti+1)*np.ones((G, G))
         else:
             self.channel_spectral_efficiencies = get_channel_spectral_efficiency()
 
@@ -181,6 +188,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
                 # Update buffer according to action and packet transmission
                 new_buffer = np.array(new_buffer_occupancy_tuple)
+
                 # decrement buffer of chosen user
                 new_buffer[chosen_user] -= num_packets_supported_by_channel
 
@@ -192,8 +200,18 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                 else:
                     num_transmitted_packets = num_packets_supported_by_channel
 
+                # traffic pattern
+                if self.traffic_pattern == "full_buffer":
+                    traffic = self.B - new_buffer[chosen_user]
+                elif self.traffic_pattern == "constant_bit_rate":
+                    traffic = self.constant_num_pkts_per_tti
+                elif self.traffic_pattern == "random":
+                    traffic = np.random.randint(1, self.B)
+                else:
+                    raise Exception("Traffic pattern not implemented")
+
                 # Update buffer based on arrival of new packets
-                new_buffer += self.num_incoming_packets_per_time_slot  # arrival of new packets
+                new_buffer += traffic  # arrival of new packets
 
                 # check if buffer overflow occurred
                 # in case positive, limit the buffers to maximum capacity
@@ -246,7 +264,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                         pos_type_count += 1
                     else:
                         raise Exception("mobility pattern not implemented")
-                    
+
                     # compose the state
                     new_state = (next_pos, new_buffer_occupancy_tuple)
                     nextStateIndice = self.indexGivenStateDictionary[new_state]
