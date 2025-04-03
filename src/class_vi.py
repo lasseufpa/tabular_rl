@@ -147,74 +147,6 @@ def valueInteration_listEnv(env,
     #assert isinstance(env, KnownDynamicsEnv)
     S = env.S
     A = env.A
-    new_action_values = np.zeros((S, A))
-    action_values = np.zeros((S, A))
-    iteration = 1
-    valid_next_states = env.get_valid_next_states()
-    stopping_criteria_per_iteration = list()
-    while True:
-        for s in range(S):
-            feasible_next_states = valid_next_states[s]
-            num_of_feasible_next_states = len(feasible_next_states)
-            for a in range(A):
-                value = 0
-                for feasible_nexts in range(num_of_feasible_next_states):
-                    nexts = feasible_next_states[feasible_nexts]
-                    # p(s'|s,a) = p(nexts|s,a)
-                    p = env.nextStateProbability[s, a, nexts]
-                    # r(s,a,s') = r(s,a,nexts)
-                    r = env.rewardsTable[s, a, nexts]
-                    best_a = np.max(action_values[nexts])
-                    value += p * (r + discountGamma * best_a)
-                new_action_values[s, a] = value
-
-        # check if should stop because process converged
-        abs_difference_array = np.abs(new_action_values - action_values)
-        stopping_criterion_option = 2  # 1 uses sum and 2 uses max
-        if stopping_criterion_option == 1:
-            # use the sum
-            stopping_criterion = np.sum(
-                abs_difference_array)/np.max(np.abs(new_action_values))
-        else:
-            # use the max
-            stopping_criterion = np.max(
-                abs_difference_array)/np.max(np.abs(new_action_values))
-        stopping_criteria_per_iteration.append(stopping_criterion)
-        # print('DEBUG: stopping_criterion =', stopping_criterion)
-        if debug:  # debug
-            print('new state values=', new_action_values)
-            print('it=', iteration, 'improvement = ', stopping_criterion)
-
-        # action_values = new_action_values.copy()
-        # I am avoiding to use np.copy() here because memory kept growing
-        for i in range(S):
-            for j in range(A):
-                action_values[i, j] = new_action_values[i, j]
-
-        if stopping_criterion <= tolerance:
-            # print('DEBUG: stopping_criterion =',
-            #      stopping_criterion, "and tolerance=", tolerance)
-            break
-
-        iteration += 1
-
-    return action_values, np.array(stopping_criteria_per_iteration)
-
-
-### To do: adapt this
-def compute_optimal_action_values_nonsparse(env,
-                                            discountGamma=0.9,
-                                            tolerance=1e-4,
-                                            debug = False) -> tuple[np.ndarray, np.ndarray]:
-    '''
-    Compute the action value function q_*(s,a) via the Bellman optimality
-    equation for action values.
-    This version does not assume nor explore sparsity.
-    In [Sutton, 2020] the main result of this method in called "the optimal
-    action-value function" and it is defined in Eq. (3.16) in page 63 and
-    Eq. (3.20) in page 64.'''
-    S = env.S
-    A = env.A
     # (S, A, nS) = env.nextStateProbability.shape
     # A = len(actionListGivenIndex)
     new_action_values = np.zeros((S, A))
@@ -222,16 +154,19 @@ def compute_optimal_action_values_nonsparse(env,
     iteration = 1
     stopping_criteria = list()
     while True:
+        
         # src = new_action_values if in_place else action_values
         for s in range(S):
             for a in range(A):
                 value = 0
                 for nexts in range(S):
+                    
+                    #print(nexts)
                     # p(s'|s,a) = p(nexts|s,a)
                     p = env.nextStateProbability[s, a, nexts]
                     # r(s,a,s') = r(s,a,nexts)
                     r = env.rewardsTable[s, a, nexts]
-                    best_a = -np.Infinity
+                    best_a = -np.inf
                     for nexta in range(A):
                         temp = action_values[nexts, nexta]
                         if temp > best_a:
@@ -253,5 +188,6 @@ def compute_optimal_action_values_nonsparse(env,
 
         action_values = new_action_values.copy()
         iteration += 1
+        print(iteration)
 
     return action_values, np.array(stopping_criteria)
