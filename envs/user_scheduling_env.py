@@ -478,5 +478,5 @@ if __name__ == '__main__':
             print_debug_info=False)  # G is the grid size
         pickle.dump(env, open(file_path, "wb"))
 
-    print(env.observation_space)
+    print(env.pretty_print_policy(fmdp.get_uniform_policy_for_fully_connected(env.S, env.A)))
 
