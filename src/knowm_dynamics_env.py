@@ -10,7 +10,7 @@ from scipy import sparse as sc
 #from class_vi import VI_agent
 #from tabular_rl import finite_mdp_utils as fmdp
 #from stable_baselines3 import DQN
-
+from stable_baselines3 import DQN
 
 class KnownDynamicsEnv(gym.Env):
     def __init__(self, nextStateProbability, rewardsTable=None, NS = None, NA = None, sparcity_treshold = 0.5):
@@ -107,8 +107,8 @@ class VerboseKnownDynamicsEnv(KnownDynamicsEnv):
         
         self.action_space = spaces.Discrete(self.A)
 
-        Low = np.array(np.full(len(self.nameStateComponents),  -10))
-        High = np.array(np.full(len(self.nameStateComponents), 10) )
+        Low = np.array(np.full(len(self.nameStateComponents),  -np.inf))
+        High = np.array(np.full(len(self.nameStateComponents), np.inf) )
         self.observation_space = spaces.Box(Low,High)
         
         
@@ -511,16 +511,4 @@ if __name__ == '__main__':
     #dynamic = prepros(nextStateProbability, rewardsTable)
     env = VerboseKnownDynamicsEnv(nextStateProbability, rewardsTable, NS=ns, NA=na, sparcity_treshold=0.5)
     
-    #print(env.get_obs())
-    #vi = VI_agent(env, debug=False)
-    #pol = fmdp.convert_action_values_into_policy(vi.Q_table)
-    #env.pretty_print_policy(pol)
-    #a = fmdp.run_several_episodes(env, pol)
-    #print(a)
-
-    #env.pretty_print_policy(pol)
-    #print(env.get_state())
-    #print(env.current_observation_or_state)
-    #print(env.step(0))
-    #x = suite_gym.load("test")
     

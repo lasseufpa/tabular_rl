@@ -46,6 +46,7 @@ from src.mobility_utils import all_valid_next_moves, combined_users_positions, o
 from src.class_vi import VI_agent as VI
 from src.class_qlearning import Qlearning_agent as QL
 
+from stable_baselines3 import DQN
 class UserSchedulingEnv(VerboseKnownDynamicsEnv):
 
     def __init__(
@@ -81,7 +82,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
             self.actions_move, G=self.G, Nu=self.Nu, B=self.B, can_users_share_position=can_users_share_position,
             show_debug_info=self.print_debug_info, disabled_positions=self.bs_position)
 
-        print(self.indexGivenStateDictionary)
+        #print(self.indexGivenStateDictionary)
         self.S = len(self.stateGivenIndexList)
 
         # self.ues_pos_prob, self.channel_spectral_efficiencies, self.ues_valid_actions = self.read_external_files()
@@ -93,7 +94,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                   self.channel_spectral_efficiencies)
 
         nextStateProbability, rewardsTable = self.createEnvironment()
-
+        
         # pack data structures (dic and list) to map names into indices for actions
         actions_info = [self.indexGivenActionDictionary,
                         self.actionGivenIndexList,
@@ -166,7 +167,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
             # current state:
             currentState = self.stateGivenIndexList[s]
             # interpret the state
-            (all_positions, new_buffer_occupancy_tuple) = currentState
+            (all_positions, new_buffer_occupancy_tuple) = unFlatten(currentState, self.Nu)
             # print('Reading state: positions=', all_positions,
             #      'buffers=', new_buffer_occupancy_tuple)
             for a in range(self.A):
@@ -258,9 +259,9 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                         pos_type_count += 1
                     else:
                         raise Exception("mobility pattern not implemented")
-
+                    #print(next_pos)
                     # compose the state
-                    new_state = (next_pos, new_buffer_occupancy_tuple)
+                    new_state = tuple(flatten((next_pos, new_buffer_occupancy_tuple))) 
                     nextStateIndice = self.indexGivenStateDictionary[new_state]
 
                     nextStateProbability[s, a, nextStateIndice] = prob
@@ -385,6 +386,7 @@ def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_sha
     all_states = itertools.product(
         all_positions_list, all_buffer_occupancy_list)
     all_states = list(all_states)
+
     if show_debug_info:
         print("all_positions_list", all_positions_list)
         # Nu is the number of users and B the buffer size
@@ -399,13 +401,25 @@ def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_sha
     uniqueIndex = 0
     # add states to both dictionary and its inverse mapping (a list)
     for i in range(N):
-        stateGivenIndexList.append(all_states[i])
-        indexGivenStateDictionary[all_states[i]] = uniqueIndex
+        aux = tuple(flatten(all_states[i]))
+        #print(aux)
+       #exit(-1)
+        stateGivenIndexList.append(aux)
+        indexGivenStateDictionary[aux] = uniqueIndex
         uniqueIndex += 1
     if False:
         print('indexGivenStateDictionary = ', indexGivenStateDictionary)
         print('stateGivenIndexList = ', stateGivenIndexList)
-    names = ["position","buffer"]
+    
+    names = []
+    for i in range(Nu):
+        names.append("px"+str(i))
+        names.append("py"+str(i))
+        
+    for j in range(Nu):
+        names.append("b"+str(j))
+    
+
     
     return indexGivenStateDictionary, stateGivenIndexList, names
 
@@ -425,6 +439,23 @@ def check_matrix(nextStateProbability):
         print(nextStateProbability.shape)
 
 
+def flatten(nested):
+    if isinstance(nested, (np.integer, int, float)):  # Base case: single value
+        return [nested]
+    elif isinstance(nested, (tuple, list)):  # Recursive case: nested structure
+        return [item for sublist in nested for item in flatten(sublist)]
+    else:
+        raise TypeError("Unsupported data type")
+    
+def unFlatten(flat, nuser):
+    b = tuple(flat[2*nuser:])
+    t = []
+    for i in range(nuser):
+        t.append((flat[0+2*i], flat[1+2*i]))
+    t = tuple(t)
+
+    return (t, b)
+    
 if __name__ == '__main__':
     print("Running main of simple_user_scheduling_env.py")
     print("Creating the UserSchedulingEnv environment... It takes some time.")
@@ -440,21 +471,12 @@ if __name__ == '__main__':
             print(
                 f"The file {file_path} does not exist. I will create the object and create the file")
         env = UserSchedulingEnv(
-            G=3, B=2, Nu=2, num_pkts_per_tti=1,
+            G=3, B=2, Nu = 2, num_pkts_per_tti=1,
             can_users_share_position=False,
             should_add_not_moving=False,
-            print_debug_info=True)  # G is the grid size
+            mobility_pattern='horiz_first',
+            print_debug_info=False)  # G is the grid size
         pickle.dump(env, open(file_path, "wb"))
 
+    print(env.observation_space)
 
-    #env.postprocessing_MDP_step(history, printPostProcessingInfo)
-    print(env.get_dynamics()[0].shape)
-    agent_vi = VI(env)
-    agent_ql = QL(env)
-
-
-    if True:
-        fmdp.compare_qlearning_VI(env, agent_vi, agent_ql)
-    if False:
-        # this may take long time to run
-        fmdp.hyperparameter_grid_search(env)
