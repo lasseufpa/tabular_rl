@@ -11,32 +11,58 @@ from scipy import sparse as sc
 #from tabular_rl import finite_mdp_utils as fmdp
 #from stable_baselines3 import DQN
 from stable_baselines3 import DQN
-
+import src.finite_mdp_utils as fmdp
 class KnownDynamicsEnv(gym.Env):
-    def __init__(self, nextStateProbability, rewardsTable=None, NS = None, NA = None, sparcity_treshold = 0.5):
+    def __init__(self, nextStateProbability, rewardsTable=None, NS = None, NA = None, sparcity_treshold = 0.5, assert_struct = 'default'):
         
         type_struct = 0
-        if isinstance(nextStateProbability, str) or isinstance(nextStateProbability, dict):
+
+        # Case 1: If nextStateProbability is a string, use DictKDEnv
+        if isinstance(nextStateProbability, str):
             struct = DictKDEnv(nextStateProbability, rewardsTable, NS, NA)
 
-        else:
-
-            num = np.nonzero(nextStateProbability)[0].size
-            dem = nextStateProbability.size
-            sparcity_rate = 1-(num/dem)
-            print(sparcity_rate, sparcity_treshold)
-
-            if sparcity_rate > sparcity_treshold:
-                dynamics = prepros(nextStateProbability, rewardsTable)
-                NS = nextStateProbability.shape[0]
-                NA = nextStateProbability.shape[1]
-
-                struct = DictKDEnv(dynamics, None, NS, NA)
-                nextStateProbability = dynamics
-                rewardsTable = None
+        # Case 2: If assert_struct is "default"
+        elif assert_struct == "default":
+            if isinstance(nextStateProbability, dict):
+                struct = DictKDEnv(nextStateProbability, rewardsTable, NS, NA)
+            
             else:
-                type_struct = 1
-                struct = listKdEnv(nextStateProbability, rewardsTable, NS, NA)
+                # Compute sparsity rate
+                num_nonzero = np.count_nonzero(nextStateProbability)
+                total_elements = nextStateProbability.size
+                sparsity_rate = 1 - (num_nonzero / total_elements)
+
+                print(sparsity_rate, sparcity_treshold)
+
+                # If sparsity is above the threshold, preprocess and use DictKDEnv
+                if sparsity_rate > sparcity_treshold:
+                    dynamics = prepros(nextStateProbability, rewardsTable)
+                    struct = DictKDEnv(dynamics, None, *nextStateProbability.shape)
+                    nextStateProbability, rewardsTable = dynamics, None
+                
+                # Otherwise, use listKdEnv
+                else:
+                    type_struct = 1
+                    struct = listKdEnv(nextStateProbability, rewardsTable, NS, NA)
+
+        # Case 3: If assert_struct is "list"
+        elif assert_struct == "list":
+            type_struct = 1
+            if isinstance(nextStateProbability, dict):
+                # Convert dict to matrix format
+                dynamics = fmdp.dict2matrix(nextStateProbability, NS, NA)
+                nextStateProbability, rewardsTable = dynamics
+            struct = listKdEnv(nextStateProbability, rewardsTable, NS, NA)
+
+        # Case 4: If assert_struct is "dict"
+        elif assert_struct == "dict":
+            type_struct = 1
+            if isinstance(nextStateProbability, list):
+                # Convert matrix to dict format
+                nextStateProbability = fmdp.matrix2dict(nextStateProbability, rewardsTable)
+            struct = DictKDEnv(nextStateProbability, rewardsTable, NS, NA)
+
+        
         
         print(f"using {struct.__class__}")
         self.nextStateProbability = nextStateProbability
@@ -82,8 +108,8 @@ class KnownDynamicsEnv(gym.Env):
 
 class VerboseKnownDynamicsEnv(KnownDynamicsEnv):
     def __init__(self, nextStateProbability, rewardsTable= None, NS = None, NA = None, sparcity_treshold = 0.5,
-                 states_info=None, actions_info=None):
-        super(VerboseKnownDynamicsEnv, self).__init__(nextStateProbability, rewardsTable, NS, NA, sparcity_treshold)
+                 states_info=None, actions_info=None, assert_struct = 'default'):
+        super(VerboseKnownDynamicsEnv, self).__init__(nextStateProbability, rewardsTable, NS, NA, sparcity_treshold, assert_struct)
         # nextStateProbability, rewardsTable)
         self.__version__ = "0.1.0"
         # print("AK Finite MDP - Version {}".format(self.__version__))
@@ -509,6 +535,6 @@ if __name__ == '__main__':
     ns = nextStateProbability.shape[0]
     na = nextStateProbability.shape[1]
     #dynamic = prepros(nextStateProbability, rewardsTable)
-    env = VerboseKnownDynamicsEnv(nextStateProbability, rewardsTable, NS=ns, NA=na, sparcity_treshold=0.5)
+    env = VerboseKnownDynamicsEnv(nextStateProbability, rewardsTable, NS=ns, NA=na, sparcity_treshold=0.5, assert_struct="dict")
     
     
