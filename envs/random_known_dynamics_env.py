@@ -1,5 +1,6 @@
 from src.knowm_dynamics_env import KnownDynamicsEnv
 import numpy as np
+import random
 from src import finite_mdp_utils as fmdp
 
 
@@ -8,23 +9,27 @@ class RandomKnownDynamicsEnv(KnownDynamicsEnv):
     Initialize a matrix with probability distributions.
     '''
 
-    def __init__(self, S: int, A: int):
-        nextStateProbability = self.init_random_next_state_probability(S, A)
-        # these rewards can be negative
-        rewardsTable = np.random.randn(S, A, S)
-        self.__version__ = "0.1.0"
-        KnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable)
+    def __init__(self, S: int, A: int, sparcity_rate:float, assert_struct:str):
 
-    def init_random_next_state_probability(self, S: int, A: int) -> np.ndarray:
-        nextStateProbability = np.random.rand(S, A, S)  # positive numbers
-        # for each pair of s and a, force numbers to be a probability distribution
+        nextStateProbability = self.init_random_next_state_probability(S, A, sparcity_rate)
+        # these rewards can be negative
+        rewardsTable = 8*np.random.randn(S, A, S)
+        self.__version__ = "0.1.0"
+        KnownDynamicsEnv.__init__(self, nextStateProbability, rewardsTable, assert_struct = 'default')
+
+    def init_random_next_state_probability(self, S: int, A: int, sparcity_rate:float) -> np.ndarray:
+        nextStateProbability = np.zeros([S,A,S])
+        nelements = int(sparcity_rate*S)
         for s in range(S):
             for a in range(A):
-                sum = np.sum(nextStateProbability[s, a])
-                if sum == 0:
-                    raise Exception(
-                        "Sum is zero. np.random.rand did not work properly?")
-                nextStateProbability[s, a] /= sum
+
+                auxVec = random.sample(range(0, S), nelements)
+
+                for i in range(len(auxVec)):
+                    nextStateProbability[s,a,auxVec[i]] = abs(10*np.random.randn())
+                
+                nextStateProbability[s,a,:] /= sum(nextStateProbability[s,a,:])
+            
         return nextStateProbability
 
 
