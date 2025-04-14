@@ -38,6 +38,7 @@ import numpy as np
 import itertools
 import pickle
 import os
+from typing import Union, Callable
 import src.optimum_values as optimum
 
 from src.knowm_dynamics_env import VerboseKnownDynamicsEnv
@@ -60,6 +61,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         print_debug_info=False,
         mobility_pattern="uniform",
         traffic_pattern="constant_bit_rate",
+        channel_pattern="fixed",
     ):
         self.G = G  # grid dimension
         self.B = B  # buffer size
@@ -70,6 +72,7 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.print_debug_info = print_debug_info
         self.mobility_pattern = mobility_pattern
         self.traffic_pattern = traffic_pattern
+        self.channel_pattern = channel_pattern
         self.bs_position = [(0,0)]
 
         self.actions_move = one_step_moves_in_grid(
@@ -86,8 +89,9 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
         self.S = len(self.stateGivenIndexList)
 
         # self.ues_pos_prob, self.channel_spectral_efficiencies, self.ues_valid_actions = self.read_external_files()
-
-        self.channel_spectral_efficiencies = get_channel_spectral_efficiency()
+        self.channel_spectral_efficiencies = get_channel_spectral_efficiency(
+            channel_pattern=self.channel_pattern
+        )
 
         if self.print_debug_info:
             print("self.channel_spectral_efficiencies",
@@ -176,8 +180,23 @@ class UserSchedulingEnv(VerboseKnownDynamicsEnv):
                 # get the channels spectral efficiency (SE)
                 chosen_user_position = all_positions[chosen_user]
 
-                se = self.channel_spectral_efficiencies[chosen_user_position[0],
-                                                        chosen_user_position[1]]
+                if self.channel_pattern == "fixed":
+                    assert isinstance(
+                        self.channel_spectral_efficiencies, np.ndarray
+                    ), "Channel spectral efficiency should be a numpy array"
+                    se = self.channel_spectral_efficiencies[
+                        chosen_user_position[0], chosen_user_position[1]
+                    ]
+                elif self.channel_pattern == "normal":
+                    assert isinstance(
+                        self.channel_spectral_efficiencies, Callable
+                    ), "Channel spectral efficiency should be a callable generator"
+                    se = next(
+                        self.channel_spectral_efficiencies(
+                            chosen_user_position[0], chosen_user_position[1]
+                        )
+                    )
+
                 # based on selected (chosen) user, update its buffer
                 num_packets_supported_by_channel = se  # it is not the transmitted packets
 
@@ -341,7 +360,7 @@ def init_rewards():
     pass
 
 
-def get_channel_spectral_efficiency(G=6, ceil_value=None) -> np.ndarray:
+def get_channel_spectral_efficiency(G=6, ceil_value=None, channel_pattern="fixed") -> np.ndarray:
     '''
     Create spectral efficiency as 0, 0, ..., 0, 1, 2, 3
     '''
@@ -357,7 +376,28 @@ def get_channel_spectral_efficiency(G=6, ceil_value=None) -> np.ndarray:
                 channel_spectral_efficiencies[i, j] = G - i -j
             else:
                 channel_spectral_efficiencies[i, j] = 1
-    return channel_spectral_efficiencies
+
+    def normal_int_generator(
+        pos_x,
+        pos_y,
+        std=0.5,
+    ):
+        while True:
+            val = int(
+                round(
+                    np.random.normal(
+                        loc=int(channel_spectral_efficiencies[pos_x, pos_y]), scale=std
+                    )
+                )
+            )
+            yield np.clip(val, 1, G)
+
+    if channel_pattern == "fixed":
+        return channel_spectral_efficiencies
+    elif channel_pattern == "normal":
+        return normal_int_generator
+    else:
+        raise Exception("Channel pattern not implemented")
 
 
 def createStatesDataStructures(possible_movements, G=6, Nu=2, B=3, can_users_share_position=False, show_debug_info=True, disabled_positions=[]) -> tuple[dict, list]:
